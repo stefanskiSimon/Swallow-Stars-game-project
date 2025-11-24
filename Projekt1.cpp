@@ -8,6 +8,8 @@
 #include <conio.h>      // _getch(), _kbhit()
 #include <windows.h>    // SetConsoleCursorPosition, Sleep, Colors
 #include <string>
+#include <cstdlib>     // rand()
+#include <vector>
 
 using namespace std;
 
@@ -108,6 +110,15 @@ struct Bird {
     int dx, dy;             // Velocity
     char symbol;
     int color;
+    vector<int> starsCollected;
+};
+
+struct Star {
+    GameWindow* parentWin;
+    int x, y;
+    char symbol;
+    int color;
+    bool collected;
 };
 
 //------------------------------------------------
@@ -194,6 +205,34 @@ void UpdateStatus(GameWindow* statWin, Bird* b) {
     statWin->printAt(2, 1, buffer);
 }
 
+void DrawStar(Star* s) {
+    setColor(s->color);
+    gotoxy(s->parentWin->x + s->x, s->parentWin->y + s->y);
+    cout << s->symbol;
+}
+void ClearStar(Star* s) {
+    gotoxy(s->parentWin->x + s->x, s->parentWin->y + s->y);
+    cout << " ";
+}
+void MoveStar(Star* s) {
+    ClearStar(s);
+    int minX = 1;
+    int maxX = s->parentWin->width - 2;
+    int minY = 1;
+    int maxY = s->parentWin->height - 2;
+
+	int nextY = s->y + 1;
+	s->y = nextY;
+    if (nextY > maxY - 1) {
+        nextY = maxY;
+		ClearStar(s);// Delete star upon reaching bottom and change position
+		s->x = rand() % (maxX - 1) + 1;
+		s->y = 1;
+    }
+    
+    DrawStar(s);
+}
+
 //------------------------------------------------
 //------------  MAIN -----------------------------
 //------------------------------------------------
@@ -203,6 +242,7 @@ int main() {
     hideCursor();
     system("cls"); // Clear standard cmd screen
     system("title Flying Bird Game");
+    srand(time(0));
 
     // 2. Initialize Windows
     GameWindow playArea = { OFFX, OFFY, COLS, ROWS, COL_BORDER };
@@ -221,6 +261,15 @@ int main() {
     bird.dy = 1;
     bird.symbol = '*';
     bird.color = COL_BIRD;
+	bird.starsCollected = {};
+
+	Star star;
+	star.parentWin = &playArea;
+	star.x = rand() % (COLS - 2) + 1;
+	star.y = 1;
+	star.symbol = '+';
+	star.color = 14;
+	star.collected = false;
 
     DrawBird(&bird);
 
@@ -228,7 +277,7 @@ int main() {
     bool running = true;
 	char direction = ' '; // Placeholder for future direction handling
     while (running) {
-
+        DrawStar(&star);
         // Input Handling (Non-blocking)
         if (_kbhit()) {
             char ch = _getch();
@@ -285,6 +334,7 @@ int main() {
 
         // Logic Updates
         MoveBird(&bird, direction);
+		MoveStar(&star);
         UpdateStatus(&statArea, &bird);
 
         // Timing
