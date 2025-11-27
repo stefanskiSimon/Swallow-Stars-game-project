@@ -32,8 +32,8 @@ using namespace std;
 #define OFFX        5       // Distance from left
 
 // Star Parameters
-#define MAX_STARS   10
-#define STAR_SPAWN_RATE 20  // Frames
+#define MAX_STARS   5
+#define STAR_SPAWN_RATE 10 // Frames
 
 // Windows Color Codes (Foreground | Background)
 // 0=Black, 1=Blue, 2=Green, 3=Cyan, 4=Red, 5=Purple, 6=Yellow, 7=White, 8=Gray...
@@ -112,6 +112,18 @@ struct GameWindow {
     }
 };
 
+struct SpriteCell
+{
+    char character;
+    int color;
+};
+
+struct Sprite {
+    int width, height;
+    vector<vector<SpriteCell>> cells;
+    int anchorX, anchorY; // Anchor point for positioning
+};
+
 struct Bird {
     GameWindow* parentWin;  // Which window is the bird inside?
     int x, y;               // Position RELATIVE to the window
@@ -121,6 +133,11 @@ struct Bird {
     int starsCollected;
     int speed;
     int life;
+    Sprite sprite;          // Current sprite
+    Sprite spriteUp;        // Directional sprites
+    Sprite spriteDown;
+    Sprite spriteLeft;
+    Sprite spriteRight;
 };
 
 struct Star {
@@ -133,29 +150,172 @@ struct Star {
 };
 
 struct StarSpawner {
-	GameWindow* parentWin;
+    GameWindow* parentWin;
     vector<Star> stars;
-	int spawnRate;
-	int maxStars;
-	DWORD lastSpawnTime;
-	DWORD nextSpawnTime;
+    int spawnRate;
+    int maxStars;
+    DWORD lastSpawnTime;
+    DWORD nextSpawnTime;
 };
+
+
+
+Star CreateStar(GameWindow* win) {
+    Star s;
+    s.parentWin = win;
+    s.x = rand() % (win->width - 2) + 1; // Avoid borders
+    s.y = 1; // Start at top
+    s.symbol = '+';
+    s.color = 14; // Yellow
+    s.active = true;
+    s.speed = 1;
+    return s;
+}
+
+Sprite CreateSprite(int width, int height, int anchorX = 0, int anchorY = 0) {
+    Sprite sprite;
+    sprite.width = width;
+    sprite.height = height;
+    sprite.cells.resize(height);
+    sprite.anchorX = anchorX;
+    sprite.anchorY = anchorY;
+
+    for(int i = 0; i < height; i++) {
+        sprite.cells[i].resize(width);
+        for(int j = 0; j < width; j++) {
+            sprite.cells[i][j].character = ' ';
+            sprite.cells[i][j].color = COL_MAIN;
+        }
+	}
+
+    return sprite;
+}
+
+Sprite CreateBirdSprite(const vector<string>& lines, int default_color, int anchorX = 0, int anchorY = 0) 
+{
+	int height = lines.size();
+    int width = 0;
+
+    for(size_t i = 0; i < lines.size(); i++) {
+        if (lines[i].length() > width) {
+            width = lines[i].length();
+        }
+	}
+
+	Sprite sprite = CreateSprite(width, height, anchorX, anchorY);
+
+    for(int y = 0; y < height; y++) {
+        for(int x = 0; x < lines[y].length(); x++) {
+            char ch = lines[y][x];
+            sprite.cells[y][x].character = ch;
+            if (ch != ' ') {
+                sprite.cells[y][x].color = default_color;
+            }
+        }
+	}
+
+    return sprite;
+}
+
+Sprite CreateBirdSpriteRight() {
+    vector<string> design = {
+        ">=>"
+    };
+	return CreateBirdSprite(design, COL_BIRD, 2, 0);
+}
+Sprite CreateBirdSpriteLeft() {
+    vector<string> design = {
+        "<=<"
+    };
+    return CreateBirdSprite(design, COL_BIRD, 0, 0);
+}
+Sprite CreateBirdSpriteUp() {
+    vector<string> design = {
+        "^",
+        "|",
+        "^"
+    };
+    return CreateBirdSprite(design, COL_BIRD, 0, 0);
+}
+Sprite CreateBirdSpriteDown() {
+    vector<string> design = {
+        ".",
+        "|",
+		"'"
+    };
+    return CreateBirdSprite(design, COL_BIRD, 0, 2);
+}
 
 //------------------------------------------------
 //------------  GAME LOGIC -----------------------
 //------------------------------------------------
 
+void DrawSprite(GameWindow* win, Sprite* sprite, int posX, int posY) {
+    for (int y = 0; y < sprite->height; y++) {
+        for (int x = 0; x < sprite->width; x++) {
+            // Calculate screen position relative to anchor
+            int screenX = win->x + posX + (x - sprite->anchorX);
+            int screenY = win->y + posY + (y - sprite->anchorY);
+
+            // Only draw if within window bounds
+            if (screenX > win->x && screenX < win->x + win->width - 1 &&
+                screenY > win->y && screenY < win->y + win->height - 1) {
+
+                char ch = sprite->cells[y][x].character;
+                if (ch != ' ') {  // Don't draw spaces (transparent)
+                    setColor(sprite->cells[y][x].color);
+                    gotoxy(screenX, screenY);
+                    cout << ch;
+                }
+            }
+        }
+    }
+}
+
+void ClearSprite(GameWindow* win, Sprite* sprite, int posX, int posY) {
+    for (int y = 0; y < sprite->height; y++) {
+        for (int x = 0; x < sprite->width; x++) {
+            int screenX = win->x + posX + (x - sprite->anchorX);
+            int screenY = win->y + posY + (y - sprite->anchorY);
+
+            if (screenX > win->x && screenX < win->x + win->width - 1 &&
+                screenY > win->y && screenY < win->y + win->height - 1) {
+
+                if (sprite->cells[y][x].character != ' ') {
+                    gotoxy(screenX, screenY);
+                    cout << " ";
+                }
+            }
+        }
+    }
+}
+
 void DrawBird(Bird* b) {
-    setColor(b->color);
-    // We add parentWin->x/y to convert relative coordinates to screen coordinates
-    gotoxy(b->parentWin->x + b->x, b->parentWin->y + b->y);
-    cout << b->symbol;
+    DrawSprite(b->parentWin, &b->sprite, b->x, b->y);
 }
 
 void ClearBird(Bird* b) {
-    // Overwrite with empty space
-    gotoxy(b->parentWin->x + b->x, b->parentWin->y + b->y);
-    cout << " ";
+	ClearSprite(b->parentWin, &b->sprite, b->x, b->y);
+}
+
+void updateBirdSprite(Bird* b, char direction) {
+    switch (direction)
+    {
+    case 'F':
+        b->sprite = b->spriteUp;
+        break;
+    case 'S':
+        b->sprite = b->spriteDown;
+        break;
+    case 'L':
+        b->sprite = b->spriteLeft;
+        break;
+    case 'R':
+        b->sprite = b->spriteRight;
+        break;
+    default:
+        break;
+    }
 }
 
 void MoveBird(Bird* b, char direction) {
@@ -215,25 +375,13 @@ void MoveBird(Bird* b, char direction) {
     DrawBird(b);
 }
 
-Star CreateStar(GameWindow* win) {
-    Star s;
-    s.parentWin = win;
-    s.x = rand() % (win->width - 2) + 1; // Avoid borders
-    s.y = 1; // Start at top
-    s.symbol = '+';
-    s.color = 14; // Yellow
-    s.active = true;
-    s.speed = 1;
-    return s;
-}
-
-void InitSpawner(Starspawner* spawner, GameWindow* win) {
+void InitSpawner(StarSpawner* spawner, GameWindow* win) {
     spawner->parentWin = win;
     spawner->spawnRate = STAR_SPAWN_RATE;
     spawner->maxStars = MAX_STARS;
 	spawner->stars.clear();
     spawner->lastSpawnTime = GetTime();
-	spawner->nextSpawnTime = lastSpawnTime + spawner->spawnRate;
+	spawner->nextSpawnTime = spawner->spawnRate;
 	spawner->stars.push_back(CreateStar(win));
 }
 
@@ -295,14 +443,42 @@ void ClearStar(Star* s) {
 
 void RespawnStar(Star* s) {
     int maxX = s->parentWin->width - 2;
+	s->color = 14; // Reset color to yellow
     s->x = rand() % (maxX - 1) + 1;
     s->y = 1;
     s->active = true;
 }
 
+void MoveStar(Star* s) {
+    if (!s->active) return;
+    ClearStar(s);
+    int minX = 1;
+    int maxX = s->parentWin->width - 2;
+    int minY = 1;
+    int maxY = s->parentWin->height - 2;
+
+    int nextY = s->y + 1;
+    s->y = nextY;
+
+    if (s->y > ROWS / 2) {
+        s->color = 9;
+    }
+    else if (s->y > ROWS * 2 / 3)
+    {
+		s->color = 4;
+    }
+
+    if (nextY > maxY - 1) {
+        nextY = maxY;
+        RespawnStar(s);
+    }
+
+    DrawStar(s);
+}
+
 void UpdateStars(StarSpawner* spawner) {
     // Try to spawn new stars
-    TrySpawnStar(spawner);
+    TryStar(spawner);
 
     // Move all active stars
     for (size_t i = 0; i < spawner->stars.size(); i++) {
@@ -318,14 +494,30 @@ void DrawAllStars(StarSpawner* spawner) {
     }
 }
 
-bool CheckCollision(Bird* b, Star* s) {
+bool CheckSpriteCollision(Bird* b, Star* s) {
+    if (!s->active) return false;
 
-    return (s->active && b->x == s->x && b->y == s->y);
+    Sprite* sprite = &b->sprite;
+
+    for (int y = 0; y < sprite->height; y++) {
+        for (int x = 0; x < sprite->width; x++) {
+            if (sprite->cells[y][x].character != ' ') {
+                // Calculate world position of this sprite cell
+                int cellX = b->x + (x - sprite->anchorX);
+                int cellY = b->y + (y - sprite->anchorY);
+
+                if (cellX == s->x && cellY == s->y) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 void CheckAllCollisions(Bird* b, StarSpawner* spawner) {
     for (size_t i = 0; i < spawner->stars.size(); i++) {
-        if (CheckCollision(b, &spawner->stars[i])) {
+        if (CheckSpriteCollision(b, &spawner->stars[i])) {
             ClearStar(&spawner->stars[i]);
             b->starsCollected++;
             RespawnStar(&spawner->stars[i]);
@@ -340,24 +532,6 @@ void CheckAllCollisions(Bird* b, StarSpawner* spawner) {
 //        RespawnStar(s);
 //    }
 //}
-
-void MoveStar(Star* s) {
-	if (!s->active) return;
-    ClearStar(s);
-    int minX = 1;
-    int maxX = s->parentWin->width - 2;
-    int minY = 1;
-    int maxY = s->parentWin->height - 2;
-
-	int nextY = s->y + 1;
-	s->y = nextY;
-    if (nextY > maxY - 1) {
-        nextY = maxY;
-        RespawnStar(s);
-    }
-    
-    DrawStar(s);
-}
 
 //------------------------------------------------
 //------------  MAIN -----------------------------
@@ -385,11 +559,16 @@ int main() {
     bird.y = ROWS / 2;
     bird.dx = 1;
     bird.dy = 1;
-    bird.symbol = '*';
+    bird.symbol = '/*';
     bird.color = COL_BIRD;
 	bird.starsCollected = 0;
 	bird.speed = 1;
     bird.life = 3;
+    bird.spriteUp = CreateBirdSpriteUp();
+    bird.spriteDown = CreateBirdSpriteDown();
+    bird.spriteLeft = CreateBirdSpriteLeft();
+    bird.spriteRight = CreateBirdSpriteRight();
+    bird.sprite = bird.spriteRight;  // Start facing right
 
     StarSpawner spawner;
 	InitSpawner(&spawner, &playArea);
@@ -400,7 +579,6 @@ int main() {
     bool running = true;
 	char direction = ' '; // Placeholder for future direction handling
     while (running) {
-        DrawStar(&star);
         // Input Handling (Non-blocking)
         if (_kbhit()) {
             char ch = _getch();
@@ -409,47 +587,59 @@ int main() {
                     running = false;
                     break;
                 case FORWARD:
+					ClearBird(&bird);
                     if (bird.dy < 0)
                     {
                         direction = 'F';
+						updateBirdSprite(&bird, direction);
                     }
                     else
 						bird.dy = -bird.dy;
 					    direction = 'F';
+						updateBirdSprite(&bird, direction);
                     break;
                 case BACKWARD:
+                    ClearBird(&bird);
                     if (bird.dy > 0)
                     {
                         direction = 'S';
+						updateBirdSprite(&bird, direction);
                     }
                     else
 						bird.dy = -bird.dy;
 					    direction = 'S';
+						updateBirdSprite(&bird, direction);
                     break;
                 case LEFT:
+                    ClearBird(&bird);
                     if (bird.dx < 0)
                     { 
                         direction = 'L';
+						updateBirdSprite(&bird, direction);
                     }
                     else
                         bird.dx = -bird.dx;
 					    direction = 'L';
+						updateBirdSprite(&bird, direction);
                     break;
                 case RIGHT:
+                    ClearBird(&bird);
                     if (bird.dx > 0)
                     {
                         direction = 'R';
+						updateBirdSprite(&bird, direction);
                     }
                     else
                         bird.dx = -bird.dx;
                         direction = 'R';
+						updateBirdSprite(&bird, direction);
                     break;
 			}
         }
 
         // Logic Updates
         MoveBird(&bird, direction);
-		updateStars(&spawner);
+		UpdateStars(&spawner);
         CheckAllCollisions(&bird, &spawner);
         UpdateStatus(&statArea, &bird);
 
