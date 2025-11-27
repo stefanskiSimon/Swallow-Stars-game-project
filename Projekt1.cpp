@@ -23,7 +23,7 @@ using namespace std;
 #define BACKWARD    's'
 #define LEFT	   'a'
 #define RIGHT	   'd'
-#define FRAME_TIME  100     // Milliseconds
+#define FRAME_TIME  50     // Milliseconds
 
 // Window Dimensions
 #define ROWS        20      // Height
@@ -34,6 +34,9 @@ using namespace std;
 // Star Parameters
 #define MAX_STARS   5
 #define STAR_SPAWN_RATE 10 // Frames
+#define STARS_SPEED 350   // Milliseconds per cell
+// Bird Parameters
+#define BIRD_SPEED 50    // Milliseconds per cell
 
 // Windows Color Codes (Foreground | Background)
 // 0=Black, 1=Blue, 2=Green, 3=Cyan, 4=Red, 5=Purple, 6=Yellow, 7=White, 8=Gray...
@@ -128,10 +131,9 @@ struct Bird {
     GameWindow* parentWin;  // Which window is the bird inside?
     int x, y;               // Position RELATIVE to the window
     int dx, dy;             // Velocity
-    char symbol;
-    int color;
     int starsCollected;
     int speed;
+    DWORD LastMoveTime;
     int life;
     Sprite sprite;          // Current sprite
     Sprite spriteUp;        // Directional sprites
@@ -147,6 +149,7 @@ struct Star {
     int color;
     bool active;
     int speed;
+    DWORD LastMoveTime;
 };
 
 struct StarSpawner {
@@ -168,7 +171,8 @@ Star CreateStar(GameWindow* win) {
     s.symbol = '+';
     s.color = 14; // Yellow
     s.active = true;
-    s.speed = 1;
+    s.speed = STARS_SPEED;
+	s.LastMoveTime = GetTime();
     return s;
 }
 
@@ -221,13 +225,13 @@ Sprite CreateBirdSpriteRight() {
     vector<string> design = {
         ">=>"
     };
-	return CreateBirdSprite(design, COL_BIRD, 2, 0);
+	return CreateBirdSprite(design, 14, 2, 0);
 }
 Sprite CreateBirdSpriteLeft() {
     vector<string> design = {
         "<=<"
     };
-    return CreateBirdSprite(design, COL_BIRD, 0, 0);
+    return CreateBirdSprite(design, 14, 0, 0);
 }
 Sprite CreateBirdSpriteUp() {
     vector<string> design = {
@@ -235,7 +239,7 @@ Sprite CreateBirdSpriteUp() {
         "|",
         "^"
     };
-    return CreateBirdSprite(design, COL_BIRD, 0, 0);
+    return CreateBirdSprite(design, 14, 0, 0);
 }
 Sprite CreateBirdSpriteDown() {
     vector<string> design = {
@@ -243,7 +247,7 @@ Sprite CreateBirdSpriteDown() {
         "|",
 		"'"
     };
-    return CreateBirdSprite(design, COL_BIRD, 0, 2);
+    return CreateBirdSprite(design, 14, 0, 2);
 }
 
 //------------------------------------------------
@@ -320,6 +324,9 @@ void updateBirdSprite(Bird* b, char direction) {
 
 void MoveBird(Bird* b, char direction) {
     // 1. Erase old position
+	DWORD currentTime = GetTime();
+	if (currentTime - b->LastMoveTime < b->speed)return;
+	b->LastMoveTime = currentTime;
     ClearBird(b);
 
     // 2. Calculate bounds (inside the border)
@@ -451,6 +458,11 @@ void RespawnStar(Star* s) {
 
 void MoveStar(Star* s) {
     if (!s->active) return;
+
+	DWORD currentTime = GetTime();
+	if (currentTime - s->LastMoveTime < s->speed) return;
+	s->LastMoveTime = currentTime;
+
     ClearStar(s);
     int minX = 1;
     int maxX = s->parentWin->width - 2;
@@ -559,10 +571,9 @@ int main() {
     bird.y = ROWS / 2;
     bird.dx = 1;
     bird.dy = 1;
-    bird.symbol = '/*';
-    bird.color = COL_BIRD;
 	bird.starsCollected = 0;
-	bird.speed = 1;
+	bird.speed = BIRD_SPEED;
+	bird.LastMoveTime = GetTime();
     bird.life = 3;
     bird.spriteUp = CreateBirdSpriteUp();
     bird.spriteDown = CreateBirdSpriteDown();
