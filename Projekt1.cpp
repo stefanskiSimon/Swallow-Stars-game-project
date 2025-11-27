@@ -31,6 +31,10 @@ using namespace std;
 #define OFFY        2       // Distance from top
 #define OFFX        5       // Distance from left
 
+// Star Parameters
+#define MAX_STARS   10
+#define STAR_SPAWN_RATE 20  // Frames
+
 // Windows Color Codes (Foreground | Background)
 // 0=Black, 1=Blue, 2=Green, 3=Cyan, 4=Red, 5=Purple, 6=Yellow, 7=White, 8=Gray...
 // Bitwise OR (|) allows mixing, e.g., FOREGROUND_INTENSITY makes it bright
@@ -63,6 +67,10 @@ void hideCursor() {
     info.dwSize = 100;
     info.bVisible = FALSE;
     SetConsoleCursorInfo(consoleHandle, &info);
+}
+
+DWORD GetTime() {
+    return GetTickCount();
 }
 
 //------------------------------------------------
@@ -110,7 +118,9 @@ struct Bird {
     int dx, dy;             // Velocity
     char symbol;
     int color;
-    vector<int> starsCollected;
+    int starsCollected;
+    int speed;
+    int life;
 };
 
 struct Star {
@@ -118,7 +128,17 @@ struct Star {
     int x, y;
     char symbol;
     int color;
-    bool collected;
+    bool active;
+    int speed;
+};
+
+struct StarSpawner {
+	GameWindow* parentWin;
+    vector<Star> stars;
+	int spawnRate;
+	int maxStars;
+	DWORD lastSpawnTime;
+	DWORD nextSpawnTime;
 };
 
 //------------------------------------------------
@@ -195,13 +215,70 @@ void MoveBird(Bird* b, char direction) {
     DrawBird(b);
 }
 
+Star CreateStar(GameWindow* win) {
+    Star s;
+    s.parentWin = win;
+    s.x = rand() % (win->width - 2) + 1; // Avoid borders
+    s.y = 1; // Start at top
+    s.symbol = '+';
+    s.color = 14; // Yellow
+    s.active = true;
+    s.speed = 1;
+    return s;
+}
+
+void InitSpawner(Starspawner* spawner, GameWindow* win) {
+    spawner->parentWin = win;
+    spawner->spawnRate = STAR_SPAWN_RATE;
+    spawner->maxStars = MAX_STARS;
+	spawner->stars.clear();
+    spawner->lastSpawnTime = GetTime();
+	spawner->nextSpawnTime = lastSpawnTime + spawner->spawnRate;
+	spawner->stars.push_back(CreateStar(win));
+}
+
+int CountActiveStars(StarSpawner* spawner) {
+    int count = 0;
+    for (size_t i = 0; i < spawner->stars.size(); i++) {
+        if (spawner->stars[i].active) count++;
+    }
+    return count;
+}
+
+void TryStar(StarSpawner* spawner) {
+    DWORD currentTime = GetTime();
+	if (currentTime - spawner->lastSpawnTime < spawner->nextSpawnTime ) return;
+    if (CountActiveStars(spawner) >= spawner->maxStars) 
+    {
+		spawner->lastSpawnTime = currentTime;
+		spawner->nextSpawnTime = spawner->lastSpawnTime + spawner->spawnRate;
+		return; // Already at max stars
+    };
+
+    bool foundSlot = false;
+    for (size_t i = 0; i < spawner->stars.size(); i++) {
+        if (!spawner->stars[i].active) {
+            // Reuse this slot
+            spawner->stars[i] = CreateStar(spawner->parentWin);
+            foundSlot = true;
+            break;
+        }
+    }
+
+    // No inactive slot found, add new star
+    if (!foundSlot) {
+        spawner->stars.push_back(CreateStar(spawner->parentWin));
+    }
+
+}
+
 void UpdateStatus(GameWindow* statWin, Bird* b) {
     setColor(statWin->color);
     // Clear the status line first (simple way: print spaces)
     statWin->printAt(2, 1, "                                           ");
 
     char buffer[50];
-    sprintf_s(buffer, "Pos: %d,%d Level: 0 Stars:  life:   [Q]=Quit", b->x, b->y);
+    sprintf_s(buffer, "Pos: %d,%d Level: 0 Stars: %d life: %d  [Q]=Quit", b->x, b->y, b->starsCollected, b->life);
     statWin->printAt(2, 1, buffer);
 }
 
@@ -210,11 +287,62 @@ void DrawStar(Star* s) {
     gotoxy(s->parentWin->x + s->x, s->parentWin->y + s->y);
     cout << s->symbol;
 }
+
 void ClearStar(Star* s) {
     gotoxy(s->parentWin->x + s->x, s->parentWin->y + s->y);
     cout << " ";
 }
+
+void RespawnStar(Star* s) {
+    int maxX = s->parentWin->width - 2;
+    s->x = rand() % (maxX - 1) + 1;
+    s->y = 1;
+    s->active = true;
+}
+
+void UpdateStars(StarSpawner* spawner) {
+    // Try to spawn new stars
+    TrySpawnStar(spawner);
+
+    // Move all active stars
+    for (size_t i = 0; i < spawner->stars.size(); i++) {
+        MoveStar(&spawner->stars[i]);
+    }
+}
+
+void DrawAllStars(StarSpawner* spawner) {
+    for (size_t i = 0; i < spawner->stars.size(); i++) {
+        if (spawner->stars[i].active) {
+            DrawStar(&spawner->stars[i]);
+        }
+    }
+}
+
+bool CheckCollision(Bird* b, Star* s) {
+
+    return (s->active && b->x == s->x && b->y == s->y);
+}
+
+void CheckAllCollisions(Bird* b, StarSpawner* spawner) {
+    for (size_t i = 0; i < spawner->stars.size(); i++) {
+        if (CheckCollision(b, &spawner->stars[i])) {
+            ClearStar(&spawner->stars[i]);
+            b->starsCollected++;
+            RespawnStar(&spawner->stars[i]);
+        }
+    }
+}
+
+//void CollectStar(Bird* b, Star* s) {
+//    if (CheckCollision(b, s)) {
+//        ClearStar(s);
+//        b->starsCollected++;
+//        RespawnStar(s);
+//    }
+//}
+
 void MoveStar(Star* s) {
+	if (!s->active) return;
     ClearStar(s);
     int minX = 1;
     int maxX = s->parentWin->width - 2;
@@ -225,9 +353,7 @@ void MoveStar(Star* s) {
 	s->y = nextY;
     if (nextY > maxY - 1) {
         nextY = maxY;
-		ClearStar(s);// Delete star upon reaching bottom and change position
-		s->x = rand() % (maxX - 1) + 1;
-		s->y = 1;
+        RespawnStar(s);
     }
     
     DrawStar(s);
@@ -261,15 +387,12 @@ int main() {
     bird.dy = 1;
     bird.symbol = '*';
     bird.color = COL_BIRD;
-	bird.starsCollected = {};
+	bird.starsCollected = 0;
+	bird.speed = 1;
+    bird.life = 3;
 
-	Star star;
-	star.parentWin = &playArea;
-	star.x = rand() % (COLS - 2) + 1;
-	star.y = 1;
-	star.symbol = '+';
-	star.color = 14;
-	star.collected = false;
+    StarSpawner spawner;
+	InitSpawner(&spawner, &playArea);
 
     DrawBird(&bird);
 
@@ -281,16 +404,8 @@ int main() {
         // Input Handling (Non-blocking)
         if (_kbhit()) {
             char ch = _getch();
-            /*if (ch == QUIT || ch == 'Q') {
-                running = false;
-            }
-            else if (ch == REVERSE) {
-                bird.dx = -bird.dx;
-                bird.dy = -bird.dy;
-            }*/
             switch(ch) {
                 case QUIT:
-                case 'Q':
                     running = false;
                     break;
                 case FORWARD:
@@ -334,7 +449,8 @@ int main() {
 
         // Logic Updates
         MoveBird(&bird, direction);
-		MoveStar(&star);
+		updateStars(&spawner);
+        CheckAllCollisions(&bird, &spawner);
         UpdateStatus(&statArea, &bird);
 
         // Timing
