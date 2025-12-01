@@ -142,6 +142,18 @@ struct Bird {
     Sprite spriteRight;
 };
 
+struct Hunters {
+    GameWindow* parentWin;
+    int x, y;
+    int dx, dy;
+    Sprite sprite;
+    int color;
+    bool active;
+    int speed;
+	DWORD LastMoveTime;
+    int BounceCount;
+};
+
 struct Star {
     GameWindow* parentWin;
     int x, y;
@@ -162,7 +174,7 @@ struct StarSpawner {
 };
 
 
-
+//Star Creation
 Star CreateStar(GameWindow* win) {
     Star s;
     s.parentWin = win;
@@ -176,6 +188,7 @@ Star CreateStar(GameWindow* win) {
     return s;
 }
 
+//Sprite Creation
 Sprite CreateSprite(int width, int height, int anchorX = 0, int anchorY = 0) {
     Sprite sprite;
     sprite.width = width;
@@ -195,6 +208,7 @@ Sprite CreateSprite(int width, int height, int anchorX = 0, int anchorY = 0) {
     return sprite;
 }
 
+//Creating a bird sprite
 Sprite CreateBirdSprite(const vector<string>& lines, int default_color, int anchorX = 0, int anchorY = 0) 
 {
 	int height = lines.size();
@@ -220,7 +234,6 @@ Sprite CreateBirdSprite(const vector<string>& lines, int default_color, int anch
 
     return sprite;
 }
-
 Sprite CreateBirdSpriteRight() {
     vector<string> design = {
         ">=>"
@@ -243,11 +256,36 @@ Sprite CreateBirdSpriteUp() {
 }
 Sprite CreateBirdSpriteDown() {
     vector<string> design = {
-        ".",
+        "v",
         "|",
-		"'"
+		"v"
     };
     return CreateBirdSprite(design, 14, 0, 2);
+}
+
+//Create Hunter Sprite and Hunter
+Sprite CreateHunterSprite() {
+    vector<string> design = {
+        "M W M",
+        "  W  ",
+        " / \\ "
+    };
+    return CreateBirdSprite(design, 10, 2, 1);
+}
+Hunters CreateHunter(GameWindow* win) {
+    Hunters h;
+    h.parentWin = win;
+    h.x = rand() % (win->width - 2) + 1;
+    h.y = rand() % (win->height - 2) + 1;
+    h.dx = 1;
+    h.dy = 1;
+    h.color = 12; // Light Red
+    h.active = true;
+    h.speed = 300;
+    h.LastMoveTime = GetTime();
+    h.BounceCount = 2;
+    h.sprite = CreateHunterSprite();
+    return h;
 }
 
 //------------------------------------------------
@@ -537,13 +575,76 @@ void CheckAllCollisions(Bird* b, StarSpawner* spawner) {
     }
 }
 
-//void CollectStar(Bird* b, Star* s) {
-//    if (CheckCollision(b, s)) {
-//        ClearStar(s);
-//        b->starsCollected++;
-//        RespawnStar(s);
-//    }
-//}
+//Hunter Logic
+void DrawHunter(Hunters* h) {
+    DrawSprite(h->parentWin, &h->sprite, h->x, h->y);
+}
+
+void ClearHunter(Hunters* h) {
+    ClearSprite(h->parentWin, &h->sprite, h->x, h->y);
+}
+
+void MoveHunters(Hunters* h) {
+	if (!h->active) return;
+	DWORD currentTime = GetTime();
+	if (currentTime - h->LastMoveTime < h->speed) return;
+	h->LastMoveTime = currentTime;
+
+	ClearHunter(h);
+
+    int minX = 1;
+    int maxX = h->parentWin->width - 2;
+    int minY = 1;
+    int maxY = h->parentWin->height - 2;
+
+	int nextX = h->x + h->dx;
+	int nextY = h->y + h->dy;
+
+    //Checking if bounceCounter is > 0
+    if (h->BounceCount <= 0) {
+		ClearHunter(h);
+        h->active = false;
+		return;
+    }
+
+    if (nextX < minX || nextX > maxX) {
+        h->dx = -h->dx;
+        h->BounceCount--;
+	}
+    else if (nextY < minY || nextY > maxY) {
+        h->dy = -h->dy;
+        h->BounceCount--;
+    }
+
+    //Move hunter towards bird?
+	h->x += h->dx;
+	h->y += h->dy;
+	DrawHunter(h);
+}
+
+void CheckHunterCollision(Bird* b, Hunters* h) {
+    if (!h->active) return;
+    Sprite* sprite = &b->sprite;
+    for (int y = 0; y < sprite->height; y++) {
+        for (int x = 0; x < sprite->width; x++) {
+            if (sprite->cells[y][x].character != ' ') {
+                // Calculate world position of this sprite cell
+                int cellX = b->x + (x - sprite->anchorX);
+                int cellY = b->y + (y - sprite->anchorY);
+                // Check collision with hunter's bounding box
+                if (cellX >= h->x && cellX < h->x + h->sprite.width &&
+                    cellY >= h->y && cellY < h->y + h->sprite.height) {
+                    // Collision detected
+                    b->life--;
+					h->BounceCount--;
+					h->dx = -h->dx;
+					h->dy = -h->dy;
+                    return;
+                }
+            }
+        }
+    }
+}
 
 //------------------------------------------------
 //------------  MAIN -----------------------------
@@ -574,7 +675,7 @@ int main() {
 	bird.starsCollected = 0;
 	bird.speed = BIRD_SPEED;
 	bird.LastMoveTime = GetTime();
-    bird.life = 3;
+    bird.life = 100;
     bird.spriteUp = CreateBirdSpriteUp();
     bird.spriteDown = CreateBirdSpriteDown();
     bird.spriteLeft = CreateBirdSpriteLeft();
@@ -584,6 +685,9 @@ int main() {
     StarSpawner spawner;
 	InitSpawner(&spawner, &playArea);
 
+	Hunters hunter = CreateHunter(&playArea);
+	DrawHunter(&hunter);
+    
     DrawBird(&bird);
 
     // 4. Main Loop
@@ -651,8 +755,14 @@ int main() {
         // Logic Updates
         MoveBird(&bird, direction);
 		UpdateStars(&spawner);
+        MoveHunters(&hunter);
         CheckAllCollisions(&bird, &spawner);
+		CheckHunterCollision(&bird, &hunter);
         UpdateStatus(&statArea, &bird);
+
+        if(bird.life <= 0) {
+            running = false;
+		}
 
         // Timing
         Sleep(FRAME_TIME);
