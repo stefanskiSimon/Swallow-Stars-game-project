@@ -3,13 +3,14 @@
     FLYING BIRD GAME - C++ Windows Console Version
     ===================================================================
 */
-
+#define _CRT_SECURE_NO_DEPRECATE 
 #include <iostream>
 #include <conio.h>      // _getch(), _kbhit()
 #include <windows.h>    // SetConsoleCursorPosition, Sleep, Colors
 #include <string>
 #include <cstdlib>     // rand()
 #include <vector>
+#include <cstring>
 
 using namespace std;
 
@@ -151,6 +152,7 @@ struct Hunters {
     int speed;
 	DWORD LastMoveTime;
     int BounceCount;
+    int damage;
 };
 
 struct HunterSpawner {
@@ -180,7 +182,6 @@ struct StarSpawner {
     DWORD lastSpawnTime;
     DWORD nextSpawnTime;
 };
-
 
 //Star Creation
 Star CreateStar(GameWindow* win) {
@@ -271,7 +272,6 @@ Sprite CreateBirdSpriteDown() {
     return CreateBirdSprite(design, 14, 0, 2);
 }
 
-//Create Hunter Sprite and Hunter
 Sprite CreateHunterSprite() {
     vector<string> design = {
         "M W M",
@@ -280,27 +280,154 @@ Sprite CreateHunterSprite() {
     };
     return CreateBirdSprite(design, 10, 0, 0);
 }
-Hunters CreateHunter(GameWindow* win) {
-    Hunters h;
-    h.parentWin = win;
-    h.sprite = CreateHunterSprite();
 
-    // Calculate valid spawn positions
+Bird loadBirdStats(const char* filename, GameWindow* win) {
+    Bird b;
+
+    FILE* file = fopen(filename, "r");
+
+    if (file == nullptr) {
+        cout << "Error opening file: " << filename << endl;
+    }
+
+    char line[256];
+	char currentSection[50] = "";
+
+    while (fgets(line, sizeof(line), file) != nullptr) {
+
+		line[strcspn(line, "\n")] = 0;
+
+		if (strlen(line) == 0) continue;
+
+        if (strchr(line, ':') == nullptr)
+        {
+            strcpy(currentSection, line);
+        }
+        else
+        {
+
+            char header[64];
+            int value;
+
+            if (sscanf(line, "%[^:]: %d", header, &value) == 2) {
+                if (strcmp(currentSection, "BIRD") == 0)
+                {
+                    if (strcmp(header, "Health") == 0) {
+                        b.life = value;
+                    }
+                    else if (strcmp(header, "Speed") == 0) {
+                        b.speed = value;
+                    }
+                }
+                else
+                    continue;
+            }
+        }
+    }
+    fclose(file);
+    b.parentWin = win;
+    b.x = COLS / 2;
+    b.y = ROWS / 2;
+    b.dx = 1;
+    b.dy = 1;
+    b.starsCollected = 0;
+    b.LastMoveTime = GetTime();
+    b.spriteUp = CreateBirdSpriteUp();
+    b.spriteDown = CreateBirdSpriteDown();
+    b.spriteLeft = CreateBirdSpriteLeft();
+    b.spriteRight = CreateBirdSpriteRight();
+    b.sprite = b.spriteRight;  // Start facing right
+
+    return b;
+}
+
+Hunters loadHuntersStats(const char* filename, GameWindow* win) {
+    Hunters h;
+
+    FILE* file = fopen(filename, "r");
+
+    if (file == nullptr) {
+        cout << "Error opening file: " << filename << endl;
+    }
+
+    char line[256];
+    char currentSection[50] = "";
+    vector<string> spriteDesign;
+
+    while (fgets(line, sizeof(line), file) != nullptr) {
+
+        line[strcspn(line, "\n")] = 0;
+
+        if (strlen(line) == 0) continue;
+
+        if (strchr(line, ':') == nullptr)
+        {
+            strcpy(currentSection, line);
+        }
+        else
+        {
+
+            char header[64];
+            char value[256];
+
+            if (sscanf(line, "%[^:]: %s", header, value) == 2) {
+                if (strcmp(currentSection, "HUNTERS") == 0)
+                {
+                    if (strcmp(header, "BounceCount") == 0) {
+                        h.BounceCount = stoi(value);
+                    }
+                    else if (strcmp(header, "HunterSpeed") == 0) {
+                        h.speed = stoi(value);
+                    }
+                    else if(strcmp(header, "Damage") == 0) {
+                        h.damage = stoi(value);
+					}
+                    else if (strcmp(header, "Sprite") == 0)
+                    {
+						string spriteLine = value;
+                        spriteDesign.push_back(spriteLine);
+                    }
+                }
+                else
+                    continue;
+            }
+        }
+    }
+    fclose(file);
+    
+	h.parentWin = win;
+    h.sprite = CreateBirdSprite(spriteDesign, 10, 0, 0);
+	h.active = true;
     int spriteWidth = h.sprite.width;
     int spriteHeight = h.sprite.height;
 
-    int leftSpawnX = 1;               
+    int leftSpawnX = 1;
     int rightSpawnX = win->width - 3 - spriteWidth;
 
-    h.x = (rand() % 2 == 0) ? leftSpawnX : rightSpawnX;
-    h.y = rand() % (win->height - 2 - spriteHeight) + 1;
+    bool rightSide = false;
+    bool leftSide = false;
 
-    h.dx = (rand() % 2 == 0) ? 1 : -1;
-    h.dy = (rand() % 2 == 0) ? 1 : -1;
-    h.active = true;
-    h.speed = 300;
-    h.LastMoveTime = GetTime();
-    h.BounceCount = 2;
+
+    if (rand() % 2 == 0) {
+        h.x = leftSpawnX;
+        leftSide = true;
+    }
+    else {
+        h.x = rightSpawnX;
+        rightSide = true;
+    }
+    h.y = rand() % (win->height - 2 - spriteHeight) + 1;
+    if (rightSide)
+    {
+        h.dx = -1;
+        h.dy = (rand() % 2 == 0) ? 1 : -1;
+    }
+    else if (leftSide)
+    {
+        h.dx = 1;
+        h.dy = (rand() % 2 == 0) ? 1 : -1;
+    }
+	h.LastMoveTime = GetTime();
 
     return h;
 }
@@ -400,18 +527,22 @@ void MoveBird(Bird* b, char direction) {
     if (nextX < minX) {
         nextX = minX;
         b->dx = -b->dx; // Reverse direction
+		b->sprite = b->spriteRight;
     }
     else if (nextX > maxX) {
         nextX = maxX;
         b->dx = -b->dx; // Reverse direction
+		b->sprite = b->spriteLeft;
 	}
     if (nextY < minY) {
         nextY = minY;
         b->dy = -b->dy; // Reverse direction
+		b->sprite = b->spriteDown;
     }
     else if (nextY > maxY) {
         nextY = maxY;
         b->dy = -b->dy; // Reverse direction
+		b->sprite = b->spriteUp;
 	}
 	// 5. Update position
     switch (direction)
@@ -455,7 +586,7 @@ void InitHunterSpawner(HunterSpawner* spawner, GameWindow* win) {
     spawner->hunters.clear();
     spawner->lastSpawnTime = GetTime();
     spawner->nextSpawnTime = spawner->spawnRate;
-    spawner->hunters.push_back(CreateHunter(win));
+    spawner->hunters.push_back(loadHuntersStats("config.txt", win));
 }
 
 int CountActiveStars(StarSpawner* spawner) {
@@ -696,7 +827,7 @@ void CheckHunterCollision(Bird* b, Hunters* h) {
                 if (cellX >= h->x && cellX < h->x + h->sprite.width &&
                     cellY >= h->y && cellY < h->y + h->sprite.height) {
                     // Collision detected
-                    b->life--;
+                    b->life = b->life - h->damage;
 					h->BounceCount--;
 					h->dx = -h->dx;
 					h->dy = -h->dy;
@@ -722,15 +853,34 @@ void RespawnHunter(Hunters* h, GameWindow* win) {
 
     int leftSpawnX = 1;
     int rightSpawnX = win->width - 3 - spriteWidth;
+    bool rightSide = false;
+    bool leftSide= false;
 
-    h->x = (rand() % 2 == 0) ? leftSpawnX : rightSpawnX;
+    if (rand() % 2 == 0) {
+        h->x = leftSpawnX;
+        leftSide = true;
+    }
+    else {
+        h->x = rightSpawnX;
+        rightSide = true;
+    }
     h->y = rand() % (win->height - 2 - spriteHeight) + 1;
-
-    h->dx = (rand() % 2 == 0) ? 1 : -1;
-    h->dy = (rand() % 2 == 0) ? 1 : -1;
+    if (rightSide)
+    {
+        h->dx = -1;
+        h->dy = (rand() % 2 == 0) ? 1 : -1;
+    }
+    else if(leftSide)
+    {
+        h->dx = 1;
+        h->dy = (rand() % 2 == 0) ? 1 : -1;
+    }
+    /*h->dx = (rand() % 2 == 0) ? 1 : -1;
+    h->dy = (rand() % 2 == 0) ? 1 : -1;*/
     h->active = true;
     h->LastMoveTime = GetTime();
     h->BounceCount = 2;
+	h->damage = 1;
 }
 
 void UpdateHunters(HunterSpawner* spawner) 
@@ -754,7 +904,7 @@ void UpdateHunters(HunterSpawner* spawner)
             }
         }
         if (!reused) {
-            spawner->hunters.push_back(CreateHunter(spawner->parentWin));
+            spawner->hunters.push_back(loadHuntersStats("config.txt", spawner->parentWin));
         }
         spawner->lastSpawnTime = currentTime;
     }
@@ -783,32 +933,13 @@ int main() {
     GameWindow statArea = { OFFX, OFFY + ROWS, COLS, 3, COL_STAT };
     statArea.drawBorder();
 
-    // 3. Initialize Bird
-    // Start in middle, moving down-right
-    Bird bird;
-    bird.parentWin = &playArea;
-    bird.x = COLS / 2;
-    bird.y = ROWS / 2;
-    bird.dx = 1;
-    bird.dy = 1;
-	bird.starsCollected = 0;
-	bird.speed = BIRD_SPEED;
-	bird.LastMoveTime = GetTime();
-    bird.life = 100;
-    bird.spriteUp = CreateBirdSpriteUp();
-    bird.spriteDown = CreateBirdSpriteDown();
-    bird.spriteLeft = CreateBirdSpriteLeft();
-    bird.spriteRight = CreateBirdSpriteRight();
-    bird.sprite = bird.spriteRight;  // Start facing right
+	Bird bird = loadBirdStats("config.txt", &playArea);
 
     StarSpawner Starspawner;
 	InitSpawner(&Starspawner, &playArea);
 
     HunterSpawner hunterSpawner;
 	InitHunterSpawner(&hunterSpawner, &playArea);
-
-	/*Hunters hunter = CreateHunter(&playArea);
-	DrawHunter(&hunter);*/
     
     DrawBird(&bird);
 

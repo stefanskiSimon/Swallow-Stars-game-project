@@ -1,0 +1,9 @@
+BIRD
+Health: 100
+Speed: 50
+
+HUNTERS
+BounceCount: 2
+HunterSpeed: 300
+Damage: 1
+Sprite: \v^v/
