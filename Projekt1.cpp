@@ -392,6 +392,10 @@ Sprite CreateBirdSpriteDown(int color) {
     return CreateBirdSprite(design, color, 0, 2);
 }
 
+}
+
+}
+
 Bird loadBirdStats(const char* filename, GameWindow* win) {
     Bird b;
 
