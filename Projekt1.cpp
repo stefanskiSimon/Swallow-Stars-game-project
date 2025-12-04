@@ -9,7 +9,7 @@
 #include <windows.h>    // SetConsoleCursorPosition, Sleep, Colors
 #include <string>
 #include <cstdlib>     // rand()
-#include <vector>
+//#include <vector>
 #include <cstring>
 
 using namespace std;
@@ -33,8 +33,8 @@ using namespace std;
 #define OFFX        5       // Distance from left
 
 // Star Parameters
-#define MAX_STARS   5
-#define STAR_SPAWN_RATE 2000
+#define MAX_STARS   8
+#define STAR_SPAWN_RATE 500
 #define STARS_SPEED 350   // Milliseconds per cell
 // Bird Parameters
 #define BIRD_SPEED 50    // Milliseconds per cell
@@ -76,6 +76,121 @@ void hideCursor() {
 DWORD GetTime() {
     return GetTickCount();
 }
+
+template <typename T> class VectorClass
+{
+    T* arr; //pointer to array
+    int capacity; //Storage max
+    int current; //Number of elements
+
+public:
+    VectorClass()
+    {
+        arr = new T[1];
+        capacity = 1;
+        current = 0;
+    }
+    //desctructor
+    ~VectorClass()
+    {
+        delete[] arr;
+    }
+
+    VectorClass(const VectorClass& other)
+    {
+        capacity = other.capacity;
+        current = other.current;
+        arr = new T[capacity];  // Allocate NEW memory
+        for (int i = 0; i < current; i++)
+        {
+            arr[i] = other.arr[i];  // Deep copy elements
+        }
+    }
+
+    VectorClass& operator=(const VectorClass& other)
+    {
+        if (this != &other)  // Prevent self-assignment
+        {
+            delete[] arr;  // Free old memory
+
+            capacity = other.capacity;
+            current = other.current;
+            arr = new T[capacity];  // Allocate NEW memory
+            for (int i = 0; i < current; i++)
+            {
+                arr[i] = other.arr[i];  // Deep copy elements
+            }
+        }
+        return *this;
+    }
+
+    void push(const T& data)
+    {
+        if (current == capacity)
+        {
+            T* temp = new T[2 * capacity]; // if capacity is at maximum, double the array capacity
+            //copy old array elements to new array
+            for (int i = 0; i < capacity; i++)
+            {
+                temp[i] = arr[i];
+            }
+            //delete old array
+            delete[] arr;
+            capacity *= 2;
+            arr = temp;
+        }
+        arr[current] = data;
+        current++;
+    }
+
+    void push_back(const T& data)
+    {
+        push(data);
+    }
+
+    void clear()
+    {
+		current = 0;
+    }
+
+    T& operator[](int index) { return arr[index]; }
+    const T& operator[](int index) const { return arr[index]; }
+
+    void push(const T& data, int index)
+    {
+        if (index == capacity)
+            push(data); //add to the last position and potentially resize
+        else
+            arr[index] = data;
+    }
+
+    T get(int index)
+    {
+        if (index < current)
+            return arr[index];
+        return -1;
+    }
+
+    void pop()
+    {
+        current--;
+    }
+
+    int size()
+    {
+        return current;
+    }
+
+    void print()
+    {
+        for (int i = 0; i < current; i++)
+        {
+            cout << arr[i] << " ";
+        }
+        cout << endl;
+    }
+
+};
 
 //------------------------------------------------
 //------------  DATA STRUCTURES ------------------
@@ -124,7 +239,8 @@ struct SpriteCell
 
 struct Sprite {
     int width, height;
-    vector<vector<SpriteCell>> cells;
+    //vector<vector<SpriteCell>> cells;
+	VectorClass< VectorClass<SpriteCell>> cells;
     int anchorX, anchorY; // Anchor point for positioning
 };
 
@@ -157,7 +273,8 @@ struct Hunters {
 
 struct HunterSpawner {
     GameWindow* parentWin;
-    vector<Hunters> hunters;
+    //vector<Hunters> hunters;
+	VectorClass<Hunters> hunters;
     int spawnRate;
     int maxHunters;
     DWORD lastSpawnTime;
@@ -167,8 +284,10 @@ struct HunterSpawner {
 struct Star {
     GameWindow* parentWin;
     int x, y;
-    char symbol;
+    string symbol;
     int color;
+    int endcolor;
+    int newcolor;
     bool active;
     int speed;
     DWORD LastMoveTime;
@@ -176,7 +295,8 @@ struct Star {
 
 struct StarSpawner {
     GameWindow* parentWin;
-    vector<Star> stars;
+    //vector<Star> stars;
+	VectorClass<Star> stars;
     int spawnRate;
     int maxStars;
     DWORD lastSpawnTime;
@@ -184,41 +304,43 @@ struct StarSpawner {
 };
 
 //Star Creation
-Star CreateStar(GameWindow* win) {
-    Star s;
-    s.parentWin = win;
-    s.x = rand() % (win->width - 2) + 1; // Avoid borders
-    s.y = 1; // Start at top
-    s.symbol = '+';
-    s.color = 14; // Yellow
-    s.active = true;
-    s.speed = STARS_SPEED;
-	s.LastMoveTime = GetTime();
-    return s;
-}
+//Star CreateStar(GameWindow* win) {
+//    Star s;
+//    s.parentWin = win;
+//    s.x = rand() % (win->width - 2) + 1; // Avoid borders
+//    s.y = 1; // Start at top
+//    s.symbol = '+';
+//    s.color = 14; // Yellow
+//    s.active = true;
+//    s.speed = STARS_SPEED;
+//	s.LastMoveTime = GetTime();
+//    return s;
+//}
 
 //Sprite Creation
 Sprite CreateSprite(int width, int height, int anchorX = 0, int anchorY = 0) {
     Sprite sprite;
     sprite.width = width;
     sprite.height = height;
-    sprite.cells.resize(height);
     sprite.anchorX = anchorX;
     sprite.anchorY = anchorY;
 
     for(int i = 0; i < height; i++) {
-        sprite.cells[i].resize(width);
+		VectorClass<SpriteCell> row;
         for(int j = 0; j < width; j++) {
-            sprite.cells[i][j].character = ' ';
-            sprite.cells[i][j].color = COL_MAIN;
+            SpriteCell cell;
+			cell.character = ' ';
+            cell.color = 7; // Default white
+			row.push(cell);
         }
+        sprite.cells.push_back(row);
 	}
 
     return sprite;
 }
 
-//Creating a bird sprite
-Sprite CreateBirdSprite(const vector<string>& lines, int default_color, int anchorX = 0, int anchorY = 0) 
+//Creating a bird/hunter sprite
+Sprite CreateBirdSprite(VectorClass<string>& lines, int default_color, int anchorX = 0, int anchorY = 0) 
 {
 	int height = lines.size();
     int width = 0;
@@ -244,41 +366,28 @@ Sprite CreateBirdSprite(const vector<string>& lines, int default_color, int anch
     return sprite;
 }
 Sprite CreateBirdSpriteRight() {
-    vector<string> design = {
-        ">=>"
-    };
+    VectorClass<string> design;
+	design.push_back(">=>");
 	return CreateBirdSprite(design, 14, 2, 0);
 }
 Sprite CreateBirdSpriteLeft() {
-    vector<string> design = {
-        "<=<"
-    };
+    VectorClass<string> design;
+	design.push_back("<=<");
     return CreateBirdSprite(design, 14, 0, 0);
 }
 Sprite CreateBirdSpriteUp() {
-    vector<string> design = {
-        "^",
-        "|",
-        "^"
-    };
+    VectorClass<string> design;
+	design.push_back("^");
+	design.push_back("|");
+	design.push_back("^");
     return CreateBirdSprite(design, 14, 0, 0);
 }
 Sprite CreateBirdSpriteDown() {
-    vector<string> design = {
-        "v",
-        "|",
-		"v"
-    };
+    VectorClass<string> design;
+	design.push_back("v");
+	design.push_back("|");
+	design.push_back("v");
     return CreateBirdSprite(design, 14, 0, 2);
-}
-
-Sprite CreateHunterSprite() {
-    vector<string> design = {
-        "M W M",
-        "  W  ",
-        " / \\ "
-    };
-    return CreateBirdSprite(design, 10, 0, 0);
 }
 
 Bird loadBirdStats(const char* filename, GameWindow* win) {
@@ -352,7 +461,7 @@ Hunters loadHuntersStats(const char* filename, GameWindow* win) {
 
     char line[256];
     char currentSection[50] = "";
-    vector<string> spriteDesign;
+    VectorClass<string> spriteDesign;
 
     while (fgets(line, sizeof(line), file) != nullptr) {
 
@@ -430,6 +539,67 @@ Hunters loadHuntersStats(const char* filename, GameWindow* win) {
 	h.LastMoveTime = GetTime();
 
     return h;
+}
+
+Star loadStarsStats(const char* filename, GameWindow* win)
+{
+    Star s;
+
+    FILE* file = fopen(filename, "r");
+
+    if (file == nullptr) {
+        cout << "Error opening file: " << filename << endl;
+    }
+
+    char line[256];
+    char currentSection[50] = "";
+
+    while (fgets(line, sizeof(line), file) != nullptr) {
+
+        line[strcspn(line, "\n")] = 0;
+
+        if (strlen(line) == 0) continue;
+
+        if (strchr(line, ':') == nullptr)
+        {
+            strcpy(currentSection, line);
+        }
+        else
+        {
+
+            char header[64];
+            char value[64];
+
+            if (sscanf(line, "%[^:]: %s", header, &value) == 2) {
+                if (strcmp(currentSection, "STARS") == 0)
+                {
+                    if (strcmp(header, "StarSpeed") == 0) {
+                        s.speed = stoi(value);
+                    }
+                    else if (strcmp(header, "StarSprite") == 0) {
+                        s.symbol = value;
+                    }
+                    else if (strcmp(header, "StarColor") == 0) {
+                        s.color = stoi(value);
+                    }
+                    else if (strcmp(header, "EndColor") == 0) {
+                        s.endcolor = stoi(value);
+                    }
+                }
+                else
+                    continue;
+            }
+        }
+    }
+    fclose(file);
+    s.parentWin = win;
+    s.active = true;
+	s.newcolor = s.color;
+    s.x = rand() % (win->width - 2) + 1; // Avoid borders
+    s.y = 1; // Start at top
+    s.LastMoveTime = GetTime();
+
+    return s;
 }
 
 //------------------------------------------------
@@ -576,7 +746,7 @@ void InitSpawner(StarSpawner* spawner, GameWindow* win) {
 	spawner->stars.clear();
     spawner->lastSpawnTime = GetTime();
 	spawner->nextSpawnTime = spawner->spawnRate;
-	spawner->stars.push_back(CreateStar(win));
+	spawner->stars.push_back(loadStarsStats("config.txt",win));
 }
 
 void InitHunterSpawner(HunterSpawner* spawner, GameWindow* win) {
@@ -611,15 +781,15 @@ void TryStar(StarSpawner* spawner) {
     for (size_t i = 0; i < spawner->stars.size(); i++) {
         if (!spawner->stars[i].active) {
             // Reuse this slot
-            spawner->stars[i] = CreateStar(spawner->parentWin);
+            spawner->stars[i] = loadStarsStats("config.txt",spawner->parentWin);
             foundSlot = true;
             break;
         }
     }
-
+	spawner->lastSpawnTime = currentTime;
     // No inactive slot found, add new star
     if (!foundSlot) {
-        spawner->stars.push_back(CreateStar(spawner->parentWin));
+        spawner->stars.push_back(loadStarsStats("config.txt",spawner->parentWin));
     }
 
 }
@@ -647,10 +817,10 @@ void ClearStar(Star* s) {
 
 void RespawnStar(Star* s) {
     int maxX = s->parentWin->width - 2;
-	s->color = 14; // Reset color to yellow
     s->x = rand() % (maxX - 1) + 1;
     s->y = 1;
     s->active = true;
+    s->color = s->newcolor;
 }
 
 void MoveStar(Star* s) {
@@ -669,12 +839,9 @@ void MoveStar(Star* s) {
     int nextY = s->y + 1;
     s->y = nextY;
 
-    if (s->y > ROWS / 2) {
-        s->color = 9;
-    }
-    else if (s->y > ROWS * 2 / 3)
+    if (s->y > ROWS / 2)
     {
-		s->color = 4;
+		s->color = s->endcolor;
     }
 
     if (nextY > maxY - 1) {
@@ -844,9 +1011,61 @@ void CheckAllHunterCollisions(Bird* b, HunterSpawner* spawner) {
     }
 }
 
-void RespawnHunter(Hunters* h, GameWindow* win) {
+void RespawnHunter(Hunters* h, GameWindow* win, const char* filename) {
+	
+    FILE* file = fopen(filename, "r");
+
+    if (file == nullptr) {
+        cout << "Error opening file: " << filename << endl;
+    }
+
+    char line[256];
+    char currentSection[50] = "";
+    VectorClass<string> spriteDesign;
+
+    while (fgets(line, sizeof(line), file) != nullptr) {
+
+        line[strcspn(line, "\n")] = 0;
+
+        if (strlen(line) == 0) continue;
+
+        if (strchr(line, ':') == nullptr)
+        {
+            strcpy(currentSection, line);
+        }
+        else
+        {
+
+            char header[64];
+            char value[256];
+
+            if (sscanf(line, "%[^:]: %s", header, value) == 2) {
+                if (strcmp(currentSection, "HUNTERS") == 0)
+                {
+                    if (strcmp(header, "BounceCount") == 0) {
+                        h->BounceCount = stoi(value);
+                    }
+                    else if (strcmp(header, "HunterSpeed") == 0) {
+                        h->speed = stoi(value);
+                    }
+                    else if (strcmp(header, "Damage") == 0) {
+                        h->damage = stoi(value);
+                    }
+                    else if (strcmp(header, "Sprite") == 0)
+                    {
+                        string spriteLine = value;
+                        spriteDesign.push_back(spriteLine);
+                    }
+                }
+                else
+                    continue;
+            }
+        }
+    }
+    fclose(file);
+
     h->parentWin = win;
-    h->sprite = CreateHunterSprite();
+    h->sprite = CreateBirdSprite(spriteDesign, 10, 0, 0);
 
     int spriteWidth = h->sprite.width;
     int spriteHeight = h->sprite.height;
@@ -879,8 +1098,6 @@ void RespawnHunter(Hunters* h, GameWindow* win) {
     h->dy = (rand() % 2 == 0) ? 1 : -1;*/
     h->active = true;
     h->LastMoveTime = GetTime();
-    h->BounceCount = 2;
-	h->damage = 1;
 }
 
 void UpdateHunters(HunterSpawner* spawner) 
@@ -898,7 +1115,7 @@ void UpdateHunters(HunterSpawner* spawner)
         bool reused = false;
         for (size_t i = 0; i < spawner->hunters.size(); ++i) {
             if (!spawner->hunters[i].active) {
-                RespawnHunter(&spawner->hunters[i], spawner->parentWin);
+                RespawnHunter(&spawner->hunters[i],spawner->parentWin, "config.txt");
                 reused = true;
                 break;
             }

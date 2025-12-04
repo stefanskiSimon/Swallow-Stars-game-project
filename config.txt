@@ -1,9 +1,26 @@
 BIRD
 Health: 100
 Speed: 50
+Color: 14
 
 HUNTERS
 BounceCount: 2
 HunterSpeed: 300
 Damage: 1
 Sprite: \v^v/
+Sprite:  ..W..
+Color: 10
+
+STARS
+StarCount: 10
+StarSpeed: 350
+StarSprite: *
+StarColor: 14
+EndColor: 9
+
+WORLDSETTINGS
+Timer: 60
+BackgroundColor: #87CEEB
+BorderColor: #000000
+MapWidth: 60
+MapHeight: 30
