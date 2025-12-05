@@ -19,8 +19,12 @@ StarColor: 14
 EndColor: 9
 
 WORLDSETTINGS
-Timer: 60
-BackgroundColor: #87CEEB
-BorderColor: #000000
+Timer: 30
+BorderColor: 3
+StatusBorder: 14
 MapWidth: 60
-MapHeight: 30
+MapHeight: 20
+StarSpawnRate: 500
+MaxStars: 10
+HuntersSpawnRate: 2000
+MaxHunters: 3
