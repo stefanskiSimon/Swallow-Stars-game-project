@@ -523,6 +523,7 @@ Hunters loadHuntersStats(const char* filename, GameWindow* win, int birdX, int b
     fclose(file);
     h.BounceCount = win->stats->currentHunterBounceCount;
     h.color = win->stats->currentHunterColor;
+    h.damage = h.damage * h.BounceCount;
     h.sprite = CreateBirdSprite(&spriteDesign, h.color, 0, 0);
 
     for (int i = 0; i < spriteDesign.count; i++) {
@@ -967,6 +968,9 @@ void CheckAllCollisions(Bird* b, StarSpawner* spawner) {
         stats->timer = stats->initialTimer;
         stats->starsRequiredForLevelUp += stats->starGoalIncrease;
         b->starsCollected = 0;
+        stats->currentHunterBounceCount++;
+        stats->baseHunterBounceCount++;
+        stats->currentHunterColor++;
     }
 }
 
