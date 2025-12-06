@@ -1,6 +1,6 @@
 ﻿/*
     ===================================================================
-    FLYING BIRD GAME - C++ Windows Console Version
+    SWALLOW STARS - C++ Windows Console Version (Refactored)
     ===================================================================
 */
 #define _CRT_SECURE_NO_DEPRECATE 
@@ -11,26 +11,33 @@
 
 using namespace std;
 
-//------------------------------------------------
-//------------  CONFIGURATION CONSTANTS ----------
-//------------------------------------------------
+// -----------------------------
+// Configuration Constants
+// -----------------------------
 
 #define QUIT        'q'
 #define FORWARD     'w'
 #define BACKWARD    's'
-#define LEFT	   'a'
-#define RIGHT	   'd'
+#define LEFT        'a'
+#define RIGHT       'd'
+#define SPEED_UP    'o'
+#define SPEED_DOWN  'p'
 #define FRAME_TIME  50     // Milliseconds
 
-// Window Dimensions
-#define OFFY        2       // Distance from top
-#define OFFX        5       // Distance from left
+// Window offset
+#define OFFY        2
+#define OFFX        5
 
-//------------------------------------------------
-//------------  CONSOLE HELPER FUNCTIONS ---------
-//------------------------------------------------
+// Array / safety limits
+#define MAX_SPRITE_HEIGHT 5
+#define MAX_SPRITE_WIDTH 10
+#define MAX_HUNTERS 10
+#define MAX_STARS 20
 
-// Move cursor to specific X, Y coordinates
+// -----------------------------
+// Console Helper Functions
+// -----------------------------
+
 void gotoxy(int x, int y) {
     COORD coord;
     coord.X = x;
@@ -38,12 +45,10 @@ void gotoxy(int x, int y) {
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 }
 
-// Change text color
 void setColor(int color) {
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
 }
 
-// Hide the blinking cursor for a cleaner look
 void hideCursor() {
     HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO info;
@@ -65,121 +70,6 @@ char* make_cstr(const char* src) {
     return dst;
 }
 
-template <typename T> class VectorClass
-{
-    T* arr; //pointer to array
-    int capacity; //Storage max
-    int current; //Number of elements
-
-public:
-    VectorClass()
-    {
-        arr = new T[1];
-        capacity = 1;
-        current = 0;
-    }
-    //desctructor
-    ~VectorClass()
-    {
-        delete[] arr;
-    }
-
-    VectorClass(const VectorClass& other)
-    {
-        capacity = other.capacity;
-        current = other.current;
-        arr = new T[capacity];  // Allocate NEW memory
-        for (int i = 0; i < current; i++)
-        {
-            arr[i] = other.arr[i];  // Deep copy elements
-        }
-    }
-
-    VectorClass& operator=(const VectorClass& other)
-    {
-        if (this != &other)  // Prevent self-assignment
-        {
-            delete[] arr;  // Free old memory
-
-            capacity = other.capacity;
-            current = other.current;
-            arr = new T[capacity];  // Allocate NEW memory
-            for (int i = 0; i < current; i++)
-            {
-                arr[i] = other.arr[i];  // Deep copy elements
-            }
-        }
-        return *this;
-    }
-
-    void push(const T& data)
-    {
-        if (current == capacity)
-        {
-            T* temp = new T[2 * capacity]; // if capacity is at maximum, double the array capacity
-            //copy old array elements to new array
-            for (int i = 0; i < capacity; i++)
-            {
-                temp[i] = arr[i];
-            }
-            //delete old array
-            delete[] arr;
-            capacity *= 2;
-            arr = temp;
-        }
-        arr[current] = data;
-        current++;
-    }
-
-    void push_back(const T& data)
-    {
-        push(data);
-    }
-
-    void clear()
-    {
-		current = 0;
-    }
-
-    T& operator[](int index) { return arr[index]; }
-    const T& operator[](int index) const { return arr[index]; }
-
-    void push(const T& data, int index)
-    {
-        if (index == capacity)
-            push(data); //add to the last position and potentially resize
-        else
-            arr[index] = data;
-    }
-
-    T get(int index)
-    {
-        if (index < current)
-            return arr[index];
-        return -1;
-    }
-
-    void pop()
-    {
-        current--;
-    }
-
-    int size()
-    {
-        return current;
-    }
-
-    void print()
-    {
-        for (int i = 0; i < current; i++)
-        {
-            cout << arr[i] << " ";
-        }
-        cout << endl;
-    }
-
-};
-
 //------------------------------------------------
 //------------  DATA STRUCTURES ------------------
 //------------------------------------------------
@@ -195,71 +85,16 @@ struct GameStats {
 	int HuntersSpawnRate;
 	int MaxHunters;
     DWORD LastTimerTick;
+    int initialTimer;
+    int baseHunterBounceCount;
+    int baseHunterColor;       
+    int currentHunterBounceCount;
+    int currentHunterColor;
+    int baseStarsRequired;
+    int starsRequiredForLevelUp;
+    int starGoalIncrease;
 };
 
-GameStats loadGameStats(const char* filename)
-{
-    GameStats stats;
-    FILE* file = fopen(filename, "r");
-
-    if (file == nullptr) {
-        cout << "Error opening file: " << filename << endl;
-	}
-
-	char line[256];
-	char currentSection[50] = "";
-
-    while (fgets(line, sizeof(line), file) != nullptr) {
-        line[strcspn(line, "\n")] = 0;
-        if (strlen(line) == 0) continue;
-        if (strchr(line, ':') == nullptr)
-        {
-            strcpy(currentSection, line);
-        }
-        else
-        {
-            char header[64];
-            int value;
-            if (sscanf(line, "%[^:]: %d", header, &value) == 2) {
-                if (strcmp(currentSection, "WORLDSETTINGS") == 0)
-                {
-                    if (strcmp(header, "Timer") == 0) {
-                        stats.timer = value;
-                    }
-                    else if (strcmp(header, "BorderColor") == 0) {
-                        stats.borderColor = value;
-                    }
-                    else if (strcmp(header, "MapWidth") == 0) {
-                        stats.MapWidth = value;
-                    }
-                    else if (strcmp(header, "MapHeight") == 0) {
-                        stats.MapHeight = value;
-                    }
-                    else if (strcmp(header, "StarSpawnRate") == 0) {
-                        stats.StarSpawnRate = value;
-                    }
-                    else if (strcmp(header, "MaxStars") == 0) {
-                        stats.MaxStars = value;
-                    }
-                    else if (strcmp(header, "HuntersSpawnRate") == 0) {
-                        stats.HuntersSpawnRate = value;
-                    }
-                    else if (strcmp(header, "MaxHunters") == 0) {
-                        stats.MaxHunters = value;
-                    }
-                    else if(strcmp(header, "StatusBorder") == 0) {
-                        stats.StatusBorder = value;
-				}
-                }
-                else
-                    continue;
-            }
-        }
-    }
-    fclose(file);
-	stats.LastTimerTick = GetTime();
-	return stats;
-}
 struct GameWindow {
     int x, y;       // Top-left screen position
     //int width, height;
@@ -306,8 +141,7 @@ struct SpriteCell
 
 struct Sprite {
     int width, height;
-    //vector<vector<SpriteCell>> cells;
-	VectorClass< VectorClass<SpriteCell>> cells;
+	SpriteCell cells[MAX_SPRITE_HEIGHT][MAX_SPRITE_WIDTH];
     int anchorX, anchorY; // Anchor point for positioning
 };
 
@@ -317,6 +151,7 @@ struct Bird {
     int dx, dy;             // Velocity
     int starsCollected;
     int speed;
+    int initialSpeed;
     int color;
     DWORD LastMoveTime;
     int life;
@@ -343,8 +178,8 @@ struct Hunters {
 
 struct HunterSpawner {
     GameWindow* parentWin;
-    //vector<Hunters> hunters;
-	VectorClass<Hunters> hunters;
+	Hunters hunters[MAX_HUNTERS];
+	int currentHunters;
     int spawnRate;
     int maxHunters;
     DWORD lastSpawnTime;
@@ -365,29 +200,19 @@ struct Star {
 
 struct StarSpawner {
     GameWindow* parentWin;
-    //vector<Star> stars;
-	VectorClass<Star> stars;
+	Star stars[MAX_STARS];
+	int currentStars;
     int spawnRate;
     int maxStars;
     DWORD lastSpawnTime;
     DWORD nextSpawnTime;
 };
 
-//Star Creation
-//Star CreateStar(GameWindow* win) {
-//    Star s;
-//    s.parentWin = win;
-//    s.x = rand() % (win->width - 2) + 1; // Avoid borders
-//    s.y = 1; // Start at top
-//    s.symbol = '+';
-//    s.color = 14; // Yellow
-//    s.active = true;
-//    s.speed = STARS_SPEED;
-//	s.LastMoveTime = GetTime();
-//    return s;
-//}
+struct SpriteDesignLines {
+    char* lines[MAX_SPRITE_HEIGHT];
+    int count;
+};
 
-//Sprite Creation
 Sprite CreateSprite(int width, int height, int anchorX = 0, int anchorY = 0) {
     Sprite sprite;
     sprite.width = width;
@@ -395,28 +220,26 @@ Sprite CreateSprite(int width, int height, int anchorX = 0, int anchorY = 0) {
     sprite.anchorX = anchorX;
     sprite.anchorY = anchorY;
 
-    for(int i = 0; i < height; i++) {
-		VectorClass<SpriteCell> row;
-        for(int j = 0; j < width; j++) {
+    for(int i = 0; i < height && i < MAX_SPRITE_HEIGHT; i++) {
+        for(int j = 0; j < width && j < MAX_SPRITE_WIDTH; j++) {
             SpriteCell cell;
 			cell.character = ' ';
             cell.color = 7; // Default white
-			row.push(cell);
         }
-        sprite.cells.push_back(row);
 	}
 
     return sprite;
 }
 
 //Creating a bird/hunter sprite
-Sprite CreateBirdSprite(VectorClass<char*>& lines, int default_color, int anchorX = 0, int anchorY = 0) 
+Sprite CreateBirdSprite(SpriteDesignLines* lines, int default_color, int anchorX = 0, int anchorY = 0) 
 {
-	int height = lines.size();
+	int height = lines->count;
     int width = 0;
 
-    for(size_t i = 0; i < (size_t)lines.size(); i++) {
-        size_t len = strlen(lines[i]);
+    for(size_t i = 0; i < height; i++) {
+		if (lines->lines[i] == nullptr) continue;
+        size_t len = strlen(lines->lines[i]);
         if (len > (size_t)width) {
             width = (int)len;
         }
@@ -424,41 +247,163 @@ Sprite CreateBirdSprite(VectorClass<char*>& lines, int default_color, int anchor
 
 	Sprite sprite = CreateSprite(width, height, anchorX, anchorY);
 
-    for(int y = 0; y < height; y++) {
-        for(int x = 0; x < (int)strlen(lines[y]); x++) {
-            char ch = lines[y][x];
-            sprite.cells[y][x].character = ch;
-            if (ch != ' ') {
-                sprite.cells[y][x].color = default_color;
+    for(int y = 0; y < height; y++) 
+        if (lines->lines[y] == nullptr) continue;
+        else {
+            for (int x = 0; x < (int)strlen(lines->lines[y]); x++) {
+                char ch = lines->lines[y][x];
+                sprite.cells[y][x].character = ch;
+                if (ch != ' ') {
+                    sprite.cells[y][x].color = default_color;
+                }
             }
         }
-	}
 
     return sprite;
 }
 Sprite CreateBirdSpriteRight(int color) {
-    VectorClass<char*> design;
-	design.push_back(make_cstr(">=>"));
-	return CreateBirdSprite(design, color, 2, 0);
+    static char* up_design[] = {
+        (char*)">=>"
+    };
+    SpriteDesignLines lines = { 0 };
+    lines.count = sizeof(up_design) / sizeof(up_design[0]);
+
+    for (int i = 0; i < lines.count; i++) {
+        lines.lines[i] = up_design[i];
+    }
+
+    return CreateBirdSprite(&lines, color, 0, 0);
 }
 Sprite CreateBirdSpriteLeft(int color) {
-    VectorClass<char*> design;
-	design.push_back(make_cstr("<=<"));
-    return CreateBirdSprite(design, color, 0, 0);
+    static char* up_design[] = {
+        (char*)"<=<"
+    };
+    SpriteDesignLines lines = { 0 };
+    lines.count = sizeof(up_design) / sizeof(up_design[0]);
+
+    for (int i = 0; i < lines.count; i++) {
+        lines.lines[i] = up_design[i];
+    }
+
+    return CreateBirdSprite(&lines, color, 0, 0);
 }
 Sprite CreateBirdSpriteUp(int color) {
-    VectorClass<char*> design;
-	design.push_back(make_cstr("^"));
-	design.push_back(make_cstr("|"));
-	design.push_back(make_cstr("^"));
-    return CreateBirdSprite(design, color, 0, 0);
+    static char* up_design[] = {
+        (char*)"^",
+        (char*)"|",
+		(char*)"^"
+    };
+    SpriteDesignLines lines = { 0 };
+    lines.count = sizeof(up_design) / sizeof(up_design[0]);
+
+    for (int i = 0; i < lines.count; i++) {
+        lines.lines[i] = up_design[i];
+    }
+
+    return CreateBirdSprite(&lines, color, 0, 0);
 }
 Sprite CreateBirdSpriteDown(int color) {
-    VectorClass<char*> design;
-	design.push_back(make_cstr("v"));
-	design.push_back(make_cstr("|"));
-	design.push_back(make_cstr("v"));
-    return CreateBirdSprite(design, color, 0, 2);
+    static char* up_design[] = {
+        (char*)"v",
+        (char*)"|",
+        (char*)"v"
+    };
+    SpriteDesignLines lines = { 0 };
+    lines.count = sizeof(up_design) / sizeof(up_design[0]);
+
+    for (int i = 0; i < lines.count; i++) {
+        lines.lines[i] = up_design[i];
+    }
+
+    return CreateBirdSprite(&lines, color, 0, 0);
+}
+
+GameStats loadGameStats(const char* filename)
+{
+    GameStats stats;
+    FILE* file = fopen(filename, "r");
+
+    if (file == nullptr) {
+        cout << "Error opening file: " << filename << endl;
+    }
+
+    char line[256];
+    char currentSection[50] = "";
+
+    while (fgets(line, sizeof(line), file) != nullptr) {
+        line[strcspn(line, "\n")] = 0;
+        if (strlen(line) == 0) continue;
+        if (strchr(line, ':') == nullptr)
+        {
+            strcpy(currentSection, line);
+        }
+        else
+        {
+            char header[64];
+            int value;
+            if (sscanf(line, "%[^:]: %d", header, &value) == 2) {
+                if (strcmp(currentSection, "WORLDSETTINGS") == 0)
+                {
+                    if (strcmp(header, "Timer") == 0) {
+                        stats.timer = value;
+                    }
+                    else if (strcmp(header, "BorderColor") == 0) {
+                        stats.borderColor = value;
+                    }
+                    else if (strcmp(header, "MapWidth") == 0) {
+                        stats.MapWidth = value;
+                    }
+                    else if (strcmp(header, "MapHeight") == 0) {
+                        stats.MapHeight = value;
+                    }
+                    else if (strcmp(header, "StarSpawnRate") == 0) {
+                        stats.StarSpawnRate = value;
+                    }
+                    else if (strcmp(header, "MaxStars") == 0) {
+                        stats.MaxStars = value;
+                    }
+                    else if (strcmp(header, "HuntersSpawnRate") == 0) {
+                        stats.HuntersSpawnRate = value;
+                    }
+                    else if (strcmp(header, "MaxHunters") == 0) {
+                        stats.MaxHunters = value;
+                    }
+                    else if (strcmp(header, "StatusBorder") == 0) {
+                        stats.StatusBorder = value;
+                    }
+                    else if (strcmp(header, "MinStarsToCollect") == 0) {
+                        stats.baseStarsRequired = value;
+                    }
+                    else if (strcmp(header, "StarGoalIncrease") == 0) {
+                        stats.starGoalIncrease = value;
+                    }
+                }
+                else {
+                    char header2[64];
+                    char value2[256];
+                    if (sscanf(line, "%[^:]: %s", header2, value2) == 2) {
+                        if (strcmp(currentSection, "HUNTERS") == 0)
+                        {
+                            if (strcmp(header2, "BounceCount") == 0) {
+                                stats.baseHunterBounceCount = atoi(value2);
+                            }
+                            else if (strcmp(header2, "Color") == 0) {
+                                stats.baseHunterColor = atoi(value2);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    fclose(file);
+    stats.currentHunterBounceCount = stats.baseHunterBounceCount;
+    stats.currentHunterColor = stats.baseHunterColor;
+    stats.starsRequiredForLevelUp = stats.baseStarsRequired;
+
+    stats.LastTimerTick = GetTime();
+    stats.initialTimer = stats.timer;
+    return stats;
 }
 
 Bird loadBirdStats(const char* filename, GameWindow* win) {
@@ -509,6 +454,7 @@ Bird loadBirdStats(const char* filename, GameWindow* win) {
     }
     fclose(file);
     b.parentWin = win;
+	b.initialSpeed = b.speed;
     b.x = win->stats->MapWidth / 2;
     b.y = win->stats->MapHeight / 2;
     b.dx = 1;
@@ -535,7 +481,7 @@ Hunters loadHuntersStats(const char* filename, GameWindow* win, int birdX, int b
 
     char line[256];
     char currentSection[50] = "";
-    VectorClass<char*> spriteDesign;
+    SpriteDesignLines spriteDesign = { 0 };
 
     while (fgets(line, sizeof(line), file) != nullptr) {
 
@@ -556,10 +502,7 @@ Hunters loadHuntersStats(const char* filename, GameWindow* win, int birdX, int b
             if (sscanf(line, "%[^:]: %s", header, value) == 2) {
                 if (strcmp(currentSection, "HUNTERS") == 0)
                 {
-                    if (strcmp(header, "BounceCount") == 0) {
-                        h.BounceCount = atoi(value);
-                    }
-                    else if (strcmp(header, "HunterSpeed") == 0) {
+                    if (strcmp(header, "HunterSpeed") == 0) {
                         h.speed = atoi(value);
                     }
                     else if(strcmp(header, "Damage") == 0) {
@@ -567,11 +510,17 @@ Hunters loadHuntersStats(const char* filename, GameWindow* win, int birdX, int b
 				}
                     else if (strcmp(header, "Sprite") == 0)
                     {
-					char* spriteLine = make_cstr(value);
-                        spriteDesign.push_back(spriteLine);
-                    }
-                    else if (strcmp(header, "Color") == 0) {
-                        h.color = atoi(value);
+                        if (spriteDesign.count < MAX_SPRITE_HEIGHT) 
+                        {
+                            size_t len = strlen(value) + 1;
+                            char* new_line = (char*)malloc(len);
+
+                            if (new_line != NULL) {
+                                strcpy(new_line, value);
+                                spriteDesign.lines[spriteDesign.count] = new_line; // Store the new line
+                                spriteDesign.count++; // Increment only on success
+                            }
+                        }
                     }
                 }
                 else
@@ -580,12 +529,22 @@ Hunters loadHuntersStats(const char* filename, GameWindow* win, int birdX, int b
         }
     }
     fclose(file);
+    h.BounceCount = win->stats->currentHunterBounceCount;
+    h.color = win->stats->currentHunterColor;
+    h.sprite = CreateBirdSprite(&spriteDesign, h.color, 0, 0);
+
+    for (int i = 0; i < spriteDesign.count; i++) {
+        if (spriteDesign.lines[i] != NULL) {
+            free(spriteDesign.lines[i]); // Free the memory allocated for the config line
+            spriteDesign.lines[i] = NULL;
+        }
+    }
     
 	h.parentWin = win;
-    h.sprite = CreateBirdSprite(spriteDesign, h.color, 0, 0);
 	h.active = true;
     h.targetX = birdX;
     h.targetY = birdY;
+
     int spriteWidth = h.sprite.width;
     int spriteHeight = h.sprite.height;
 
@@ -683,6 +642,18 @@ Star loadStarsStats(const char* filename, GameWindow* win)
 //------------------------------------------------
 //------------  GAME LOGIC -----------------------
 //------------------------------------------------
+
+void ScaleHunters(GameStats* stats) {
+    int timeElapsed = stats->initialTimer - stats->timer;
+    int totalTime = stats->initialTimer;
+
+    if (stats->timer <= totalTime / 2) {
+        if (stats->currentHunterBounceCount == stats->baseHunterBounceCount) {
+            stats->currentHunterBounceCount += 1;
+            stats->currentHunterColor += 1;
+        }
+    }
+}
 
 void DrawSprite(GameWindow* win, Sprite* sprite, int posX, int posY) {
     for (int y = 0; y < sprite->height; y++) {
@@ -822,25 +793,31 @@ void InitSpawner(StarSpawner* spawner, GameWindow* win) {
     spawner->parentWin = win;
     spawner->spawnRate = win->stats->StarSpawnRate;
     spawner->maxStars = win->stats->MaxStars;
-	spawner->stars.clear();
+	spawner->currentStars = 0;
     spawner->lastSpawnTime = GetTime();
 	spawner->nextSpawnTime = spawner->spawnRate;
-	spawner->stars.push_back(loadStarsStats("config.txt",win));
+    if (spawner->currentStars < spawner->maxStars && spawner->currentStars < MAX_STARS) {
+        spawner->stars[spawner->currentStars] = loadStarsStats("config.txt", win);
+        spawner->currentStars++;
+    }
 }
 
 void InitHunterSpawner(HunterSpawner* spawner, GameWindow* win, Bird* bird) {
     spawner->parentWin = win;
     spawner->spawnRate = win->stats->HuntersSpawnRate;
     spawner->maxHunters = win->stats->MaxHunters;
-    spawner->hunters.clear();
+    spawner->currentHunters = 0;
     spawner->lastSpawnTime = GetTime();
     spawner->nextSpawnTime = spawner->spawnRate;
-    spawner->hunters.push_back(loadHuntersStats("config.txt", win, bird->x, bird->y));
+    if (spawner->currentHunters < spawner->maxHunters && spawner->currentHunters < MAX_HUNTERS) {
+        spawner->hunters[spawner->currentHunters] = loadHuntersStats("config.txt", win, bird->x, bird->y);
+        spawner->currentHunters++;
+    }
 }
 
 int CountActiveStars(StarSpawner* spawner) {
     int count = 0;
-    for (size_t i = 0; i < spawner->stars.size(); i++) {
+    for (size_t i = 0; i < spawner->currentStars; i++) {
         if (spawner->stars[i].active) count++;
     }
     return count;
@@ -857,7 +834,7 @@ void TryStar(StarSpawner* spawner) {
     };
 
     bool foundSlot = false;
-    for (size_t i = 0; i < spawner->stars.size(); i++) {
+    for (size_t i = 0; i < spawner->currentStars; i++) {
         if (!spawner->stars[i].active) {
             // Reuse this slot
             spawner->stars[i] = loadStarsStats("config.txt",spawner->parentWin);
@@ -867,8 +844,9 @@ void TryStar(StarSpawner* spawner) {
     }
 	spawner->lastSpawnTime = currentTime;
     // No inactive slot found, add new star
-    if (!foundSlot) {
-        spawner->stars.push_back(loadStarsStats("config.txt",spawner->parentWin));
+    if (!foundSlot && spawner->currentStars < MAX_STARS) {
+        spawner->stars[spawner->currentStars] = loadStarsStats("config.txt", spawner->parentWin);
+        spawner->currentStars++;
     }
 
 }
@@ -884,8 +862,10 @@ void UpdateTimer(GameWindow* statwin) {
 void UpdateStatus(GameWindow* statWin, Bird* b) {
     setColor(statWin->stats->StatusBorder);
     statWin->printAt(2, 1, "                                           ");
-    char buffer[256];
-    sprintf_s(buffer, "Pos: %d,%d Level: 0 Stars: %d life: %d Timer: %d [Q]=Quit", b->x, b->y, b->starsCollected, b->life, statWin->stats->timer);
+    char buffer[64];
+	int requiredStars = statWin->stats->starsRequiredForLevelUp;
+    sprintf_s(buffer, sizeof(buffer), "Stars: %d/%d life: %d Timer: %d [Q]=Quit", 
+        b->starsCollected,requiredStars , b->life, statWin->stats->timer);
     statWin->printAt(2, 1, buffer);
 }
 
@@ -942,13 +922,13 @@ void UpdateStars(StarSpawner* spawner) {
     TryStar(spawner);
 
     // Move all active stars
-    for (size_t i = 0; i < spawner->stars.size(); i++) {
+    for (size_t i = 0; i < spawner->currentStars; i++) {
         MoveStar(&spawner->stars[i]);
     }
 }
 
 void DrawAllStars(StarSpawner* spawner) {
-    for (size_t i = 0; i < spawner->stars.size(); i++) {
+    for (size_t i = 0; i < spawner->currentStars; i++) {
         if (spawner->stars[i].active) {
             DrawStar(&spawner->stars[i]);
         }
@@ -977,12 +957,19 @@ bool CheckSpriteCollision(Bird* b, Star* s) {
 }
 
 void CheckAllCollisions(Bird* b, StarSpawner* spawner) {
-    for (size_t i = 0; i < spawner->stars.size(); i++) {
+    for (size_t i = 0; i < spawner->currentStars; i++) {
         if (CheckSpriteCollision(b, &spawner->stars[i])) {
             ClearStar(&spawner->stars[i]);
             b->starsCollected++;
             RespawnStar(&spawner->stars[i]);
         }
+    }
+
+    GameStats* stats = b->parentWin->stats;
+    if (b->starsCollected >= stats->starsRequiredForLevelUp) {
+        stats->timer = stats->initialTimer;
+        stats->starsRequiredForLevelUp += stats->starGoalIncrease;
+        b->starsCollected = 0;
     }
 }
 
@@ -995,12 +982,9 @@ void DrawHunter(Hunters* h) {
 
     int screenSpriteLeft = h->parentWin->x + h->x - h->sprite.anchorX;
     int screenSpriteTop = h->parentWin->y + h->y - h->sprite.anchorY;
-
-    // Pozycja etykiety (wyśrodkowana nad sprite)
     int screenLabelX = screenSpriteLeft + (h->sprite.width - LabelWidth) / 2;
-    int screenLabelY = screenSpriteTop - 1; // jedna linia nad sprite
+    int screenLabelY = screenSpriteTop - 1;
 
-    // Sprawdź granice okna (nie rysuj poza obrębem okna)
     if (screenLabelY > h->parentWin->y && screenLabelX >= h->parentWin->x &&
         screenLabelX + LabelWidth <= h->parentWin->x + h->parentWin->stats->MapWidth) {
         setColor(h->color);
@@ -1045,7 +1029,6 @@ void MoveHunters(Hunters* h) {
 	int nextX = h->x + h->dx;
 	int nextY = h->y + h->dy;
 
-    //Checking if bounceCounter is > 0
     if (h->BounceCount <= 0) {
 		ClearHunter(h);
         h->active = false;
@@ -1092,7 +1075,7 @@ void CheckHunterCollision(Bird* b, Hunters* h) {
 }
 
 void CheckAllHunterCollisions(Bird* b, HunterSpawner* spawner) {
-    for (size_t i = 0; i < spawner->hunters.size(); i++) {
+    for (size_t i = 0; i < spawner->currentHunters; i++) {
         CheckHunterCollision(b, &spawner->hunters[i]);
     }
 }
@@ -1107,7 +1090,7 @@ void RespawnHunter(Hunters* h, GameWindow* win, const char* filename, int birdX,
 
     char line[256];
     char currentSection[50] = "";
-    VectorClass<char*> spriteDesign;
+    SpriteDesignLines spriteDesign = { 0 };
 
     while (fgets(line, sizeof(line), file) != nullptr) {
 
@@ -1128,10 +1111,7 @@ void RespawnHunter(Hunters* h, GameWindow* win, const char* filename, int birdX,
             if (sscanf(line, "%[^:]: %s", header, value) == 2) {
                 if (strcmp(currentSection, "HUNTERS") == 0)
                 {
-                    if (strcmp(header, "BounceCount") == 0) {
-                        h->BounceCount = atoi(value);
-                    }
-                    else if (strcmp(header, "HunterSpeed") == 0) {
+                    if (strcmp(header, "HunterSpeed") == 0) {
                         h->speed = atoi(value);
                     }
                     else if (strcmp(header, "Damage") == 0) {
@@ -1139,8 +1119,17 @@ void RespawnHunter(Hunters* h, GameWindow* win, const char* filename, int birdX,
                     }
                     else if (strcmp(header, "Sprite") == 0)
                     {
-                        char* spriteLine = make_cstr(value);
-                        spriteDesign.push_back(spriteLine);
+                        if (spriteDesign.count < MAX_SPRITE_HEIGHT)
+                        {
+                            size_t len = strlen(value) + 1;
+                            char* new_line = (char*)malloc(len);
+
+                            if (new_line != NULL) {
+                                strcpy(new_line, value);
+                                spriteDesign.lines[spriteDesign.count] = new_line; // Store the new line
+                                spriteDesign.count++; // Increment only on success
+                            }
+                        }
                     }
                 }
                 else
@@ -1150,8 +1139,18 @@ void RespawnHunter(Hunters* h, GameWindow* win, const char* filename, int birdX,
     }
     fclose(file);
 
+    h->BounceCount = win->stats->currentHunterBounceCount;
+    h->color = win->stats->currentHunterColor;
+    h->sprite = CreateBirdSprite(&spriteDesign, h->color, 0, 0);
+
+    for (int i = 0; i < spriteDesign.count; i++) {
+        if (spriteDesign.lines[i] != NULL) {
+            free(spriteDesign.lines[i]);
+            spriteDesign.lines[i] = NULL;
+        }
+    }
+
     h->parentWin = win;
-    h->sprite = CreateBirdSprite(spriteDesign, 10, 0, 0);
     h->targetX = birdX;
     h->targetY = birdY;
 
@@ -1191,28 +1190,29 @@ void UpdateHunters(HunterSpawner* spawner, Bird* bird)
 
     // Count active hunters
     int activeCount = 0;
-    for (size_t i = 0; i < spawner->hunters.size(); ++i) {
+    for (size_t i = 0; i < spawner->currentHunters; ++i) {
         if (spawner->hunters[i].active) ++activeCount;
     }
 
     // If it's time to spawn and we have capacity, respawn an inactive slot or add a new hunter
     if ((int)activeCount < spawner->maxHunters && (currentTime - spawner->lastSpawnTime >= spawner->spawnRate)) {
         bool reused = false;
-        for (size_t i = 0; i < spawner->hunters.size(); ++i) {
+        for (size_t i = 0; i < spawner->currentHunters; ++i) {
             if (!spawner->hunters[i].active) {
                 RespawnHunter(&spawner->hunters[i],spawner->parentWin, "config.txt", bird->x, bird->y);
                 reused = true;
                 break;
             }
         }
-        if (!reused) {
-            spawner->hunters.push_back(loadHuntersStats("config.txt", spawner->parentWin, bird->x, bird->y));
+        if (!reused && spawner->currentHunters < MAX_STARS) {
+            spawner->hunters[spawner->currentHunters] = loadHuntersStats("config.txt", spawner->parentWin, bird->x, bird->y);
+            spawner->currentHunters++;
         }
         spawner->lastSpawnTime = currentTime;
     }
 
     // Move all hunters (active ones will be processed inside MoveHunters)
-    for (size_t i = 0; i < spawner->hunters.size(); i++) {
+    for (size_t i = 0; i < spawner->currentHunters; i++) {
         MoveHunters(&spawner->hunters[i]);
     }
 }
@@ -1238,6 +1238,7 @@ int main() {
     statArea.drawBorder();
 
 	Bird bird = loadBirdStats("config.txt", &playArea);
+	Hunters hunter = loadHuntersStats("config.txt", &playArea, bird.x, bird.y);
 
     StarSpawner Starspawner;
 	InitSpawner(&Starspawner, &playArea);
@@ -1306,12 +1307,25 @@ int main() {
                         direction = 'R';
 					updateBirdSprite(&bird, direction);
                     break;
+                case SPEED_UP:
+                    if (bird.speed <= bird.initialSpeed/2)
+                        break;
+					else
+                        bird.speed -= bird.speed/10;
+                    break;
+				case SPEED_DOWN:
+                    if(bird.speed >= 2*bird.initialSpeed)
+                        break;
+					else
+                        bird.speed += bird.speed/10;
+                    break;
 			}
         }
 
         // Logic Updates
         MoveBird(&bird, direction);
 		UpdateStars(&Starspawner);
+		ScaleHunters(&gameStats);
 		UpdateHunters(&hunterSpawner, &bird);
         CheckAllCollisions(&bird, &Starspawner);
 		CheckAllHunterCollisions(&bird, &hunterSpawner);
