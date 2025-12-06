@@ -1,6 +1,6 @@
 ﻿/*
     ===================================================================
-    SWALLOW STARS - C++ Windows Console Version (Refactored)
+    SWALLOW STARS - C++ Windows Console Version
     ===================================================================
 */
 #define _CRT_SECURE_NO_DEPRECATE 
@@ -61,15 +61,6 @@ DWORD GetTime() {
     return GetTickCount();
 }
 
-// helper to create modifiable C-strings from literals or other char*s
-char* make_cstr(const char* src) {
-    if (src == nullptr) return nullptr;
-    size_t len = strlen(src);
-    char* dst = new char[len + 1];
-    strcpy(dst, src);
-    return dst;
-}
-
 //------------------------------------------------
 //------------  DATA STRUCTURES ------------------
 //------------------------------------------------
@@ -103,30 +94,25 @@ struct GameWindow {
     int height;
     int color;
 
-    // Draw the box border
     void drawBorder() {
         setColor(color);
 
-        // Top Border
         gotoxy(x, y);
         cout << "+";
         for (int i = 0; i < width - 2; i++) cout << "-";
         cout << "+";
 
-        // Side Borders
         for (int i = 1; i < height - 1; i++) {
             gotoxy(x, y + i); cout << "|";
             gotoxy(x + width - 1, y + i); cout << "|";
         }
 
-        // Bottom Border
         gotoxy(x, y + height - 1);
         cout << "+";
         for (int i = 0; i < width - 2; i++) cout << "-";
         cout << "+";
     }
 
-    // Write text inside the window
     void printAt(int relX, int relY, const char* text) {
         gotoxy(x + relX, y + relY);
         cout << text;
@@ -142,21 +128,21 @@ struct SpriteCell
 struct Sprite {
     int width, height;
 	SpriteCell cells[MAX_SPRITE_HEIGHT][MAX_SPRITE_WIDTH];
-    int anchorX, anchorY; // Anchor point for positioning
+    int anchorX, anchorY;
 };
 
 struct Bird {
-    GameWindow* parentWin;  // Which window is the bird inside?
-    int x, y;               // Position RELATIVE to the window
-    int dx, dy;             // Velocity
+    GameWindow* parentWin;
+    int x, y;
+    int dx, dy;
     int starsCollected;
     int speed;
     int initialSpeed;
     int color;
     DWORD LastMoveTime;
     int life;
-    Sprite sprite;          // Current sprite
-    Sprite spriteUp;        // Directional sprites
+    Sprite sprite;
+    Sprite spriteUp;
     Sprite spriteDown;
     Sprite spriteLeft;
     Sprite spriteRight;
@@ -213,6 +199,10 @@ struct SpriteDesignLines {
     int count;
 };
 
+//------------------------------------------------
+//------------  SPRITE FUNCTIONS ------------------
+//------------------------------------------------
+
 Sprite CreateSprite(int width, int height, int anchorX = 0, int anchorY = 0) {
     Sprite sprite;
     sprite.width = width;
@@ -221,17 +211,15 @@ Sprite CreateSprite(int width, int height, int anchorX = 0, int anchorY = 0) {
     sprite.anchorY = anchorY;
 
     for(int i = 0; i < height && i < MAX_SPRITE_HEIGHT; i++) {
-        for(int j = 0; j < width && j < MAX_SPRITE_WIDTH; j++) {
+        for (int j = 0; j < width && j < MAX_SPRITE_WIDTH; j++) {
             SpriteCell cell;
-			cell.character = ' ';
-            cell.color = 7; // Default white
+            cell.character = ' ';
+            cell.color = 7;
         }
 	}
 
     return sprite;
 }
-
-//Creating a bird/hunter sprite
 Sprite CreateBirdSprite(SpriteDesignLines* lines, int default_color, int anchorX = 0, int anchorY = 0) 
 {
 	int height = lines->count;
@@ -317,6 +305,10 @@ Sprite CreateBirdSpriteDown(int color) {
 
     return CreateBirdSprite(&lines, color, 0, 0);
 }
+
+//------------------------------------------------
+//------------  LOADING CONFIGURATION  ------------
+//------------------------------------------------
 
 GameStats loadGameStats(const char* filename)
 {
@@ -643,18 +635,6 @@ Star loadStarsStats(const char* filename, GameWindow* win)
 //------------  GAME LOGIC -----------------------
 //------------------------------------------------
 
-void ScaleHunters(GameStats* stats) {
-    int timeElapsed = stats->initialTimer - stats->timer;
-    int totalTime = stats->initialTimer;
-
-    if (stats->timer <= totalTime / 2) {
-        if (stats->currentHunterBounceCount == stats->baseHunterBounceCount) {
-            stats->currentHunterBounceCount += 1;
-            stats->currentHunterColor += 1;
-        }
-    }
-}
-
 void DrawSprite(GameWindow* win, Sprite* sprite, int posX, int posY) {
     for (int y = 0; y < sprite->height; y++) {
         for (int x = 0; x < sprite->width; x++) {
@@ -692,6 +672,18 @@ void ClearSprite(GameWindow* win, Sprite* sprite, int posX, int posY) {
                     cout << " ";
                 }
             }
+        }
+    }
+}
+
+void ScaleHunters(GameStats* stats) {
+    int timeElapsed = stats->initialTimer - stats->timer;
+    int totalTime = stats->initialTimer;
+
+    if (stats->timer <= totalTime / 2) {
+        if (stats->currentHunterBounceCount == stats->baseHunterBounceCount) {
+            stats->currentHunterBounceCount += 1;
+            stats->currentHunterColor += 1;
         }
     }
 }
@@ -788,7 +780,10 @@ void MoveBird(Bird* b, char direction) {
     DrawBird(b);
 }
 
-//Spawners
+//------------------------------------------------
+//------------  SPAWNER AND UPDATE FUNCTIONS -----------------------
+//------------------------------------------------
+
 void InitSpawner(StarSpawner* spawner, GameWindow* win) {
     spawner->parentWin = win;
     spawner->spawnRate = win->stats->StarSpawnRate;
@@ -868,6 +863,8 @@ void UpdateStatus(GameWindow* statWin, Bird* b) {
         b->starsCollected,requiredStars , b->life, statWin->stats->timer);
     statWin->printAt(2, 1, buffer);
 }
+
+// Star Logic
 
 void DrawStar(Star* s) {
     setColor(s->color);
@@ -1222,15 +1219,13 @@ void UpdateHunters(HunterSpawner* spawner, Bird* bird)
 //------------------------------------------------
 
 int main() {
-    // 1. Setup Console
     hideCursor();
-    system("cls"); // Clear standard cmd screen
+    system("cls");
     system("title Flying Bird Game");
     srand(time(0));
 
 	GameStats gameStats = loadGameStats("config.txt");
 
-    // 2. Initialize Windows
     GameWindow playArea = { OFFX, OFFY, &gameStats, gameStats.MapWidth, gameStats.MapHeight, gameStats.borderColor};
     playArea.drawBorder();
 
@@ -1248,11 +1243,9 @@ int main() {
     
     DrawBird(&bird);
 
-    // 4. Main Loop
     bool running = true;
-	char direction = ' '; // Placeholder for future direction handling
+	char direction = ' ';
     while (running) {
-        // Input Handling (Non-blocking)
         if (_kbhit()) {
             char ch = _getch();
             switch(ch) {
@@ -1335,8 +1328,6 @@ int main() {
         if(bird.life <= 0 || statArea.stats->timer <= 0) {
             running = false;
 		}
-
-        // Timing
         Sleep(FRAME_TIME);
     }
 
