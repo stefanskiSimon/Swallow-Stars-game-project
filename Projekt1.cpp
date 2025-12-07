@@ -962,22 +962,6 @@ void ProcessUserInput(Bird* bird, bool* running, char* direction) {
     }
 }
 
-void UpdateGameFrame(Bird* bird, StarSpawner* starSpawner, HunterSpawner* hunterSpawner, GameStats* gameStats, GameWindow* statArea, bool* running, char* direction) {
-    // Logic Updates
-    MoveBird(bird, *direction);
-    UpdateStars(starSpawner);
-    ScaleHunters(gameStats);
-    UpdateHunters(hunterSpawner, bird);
-    CheckAllCollisions(bird, starSpawner);
-    CheckAllHunterCollisions(bird, hunterSpawner);
-    UpdateTimer(statArea);
-    UpdateStatus(statArea, bird);
-
-    if(bird->life <= 0 || statArea->stats->timer <= 0) {
-        *running = false;
-    }
-}
-
 // Star Logic
 
 void DrawStar(Star* s) {
@@ -1330,6 +1314,23 @@ void UpdateHunters(HunterSpawner* spawner, Bird* bird)
         MoveHunters(&spawner->hunters[i]);
     }
 }
+
+void UpdateGameFrame(Bird* bird, StarSpawner* starSpawner, HunterSpawner* hunterSpawner, GameStats* gameStats, GameWindow* statArea, bool* running, char* direction) {
+    // Logic Updates
+    MoveBird(bird, *direction);
+    UpdateStars(starSpawner);
+    ScaleHunters(gameStats);
+    UpdateHunters(hunterSpawner, bird);
+    CheckAllCollisions(bird, starSpawner);
+    CheckAllHunterCollisions(bird, hunterSpawner);
+    UpdateTimer(statArea);
+    UpdateStatus(statArea, bird);
+
+    if(bird->life <= 0 || statArea->stats->timer <= 0) {
+        *running = false;
+    }
+}
+
 //------------------------------------------------
 //------------  MAIN -----------------------------
 //------------------------------------------------
