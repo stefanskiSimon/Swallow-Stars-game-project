@@ -864,6 +864,120 @@ void UpdateStatus(GameWindow* statWin, Bird* b) {
     statWin->printAt(2, 1, buffer);
 }
 
+void InitializeGameSystems(GameStats* gameStats, GameWindow* playArea, GameWindow* statArea) {
+    hideCursor();
+    system("cls");
+    system("title Flying Bird Game");
+    srand(time(0));
+
+    *gameStats = loadGameStats("config.txt");
+
+    // Initialize playArea
+    playArea->x = OFFX; 
+    playArea->y = OFFY; 
+    playArea->stats = gameStats; 
+    playArea->width = gameStats->MapWidth; 
+    playArea->height = gameStats->MapHeight; 
+    playArea->color = gameStats->borderColor;
+    playArea->drawBorder();
+
+    // Initialize statArea
+    statArea->x = OFFX; 
+    statArea->y = OFFY + gameStats->MapHeight; 
+    statArea->stats = gameStats; 
+    statArea->width = gameStats->MapWidth; 
+    statArea->height = gameStats->MapHeight / 4; 
+    statArea->color = gameStats->StatusBorder;
+    statArea->drawBorder();
+}
+
+void SetupGameObjects(GameStats* gameStats, GameWindow* playArea, Bird* bird, StarSpawner* starSpawner, HunterSpawner* hunterSpawner) {
+    *bird = loadBirdStats("config.txt", playArea);
+    InitSpawner(starSpawner, playArea);
+    InitHunterSpawner(hunterSpawner, playArea, bird);
+}
+
+void ProcessUserInput(Bird* bird, bool* running, char* direction) {
+    if (_kbhit()) {
+        char ch = _getch();
+        switch(ch) {
+            case QUIT:
+                *running = false;
+                break;
+            case FORWARD:
+                ClearBird(bird);
+                if (bird->dy < 0) {
+                    *direction = 'F';
+                    updateBirdSprite(bird, *direction);
+                } else {
+                    bird->dy = -bird->dy;
+                    *direction = 'F';
+                    updateBirdSprite(bird, *direction);
+                }
+                break;
+            case BACKWARD:
+                ClearBird(bird);
+                if (bird->dy > 0) {
+                    *direction = 'S';
+                    updateBirdSprite(bird, *direction);
+                } else {
+                    bird->dy = -bird->dy;
+                    *direction = 'S';
+                    updateBirdSprite(bird, *direction);
+                }
+                break;
+            case LEFT:
+                ClearBird(bird);
+                if (bird->dx < 0) { 
+                    *direction = 'L';
+                    updateBirdSprite(bird, *direction);
+                } else {
+                    bird->dx = -bird->dx;
+                    *direction = 'L';
+                    updateBirdSprite(bird, *direction);
+                }
+                break;
+            case RIGHT:
+                ClearBird(bird);
+                if (bird->dx > 0) {
+                    *direction = 'R';
+                    updateBirdSprite(bird, *direction);
+                } else {
+                    bird->dx = -bird->dx;
+                    *direction = 'R';
+                    updateBirdSprite(bird, *direction);
+                }
+                break;
+            case SPEED_UP:
+                if (bird->speed > bird->initialSpeed / 2) {
+                    bird->speed -= bird->speed / 10;
+                }
+                break;
+            case SPEED_DOWN:
+                if (bird->speed < 2 * bird->initialSpeed) {
+                    bird->speed += bird->speed / 10;
+                }
+                break;
+        }
+    }
+}
+
+void UpdateGameFrame(Bird* bird, StarSpawner* starSpawner, HunterSpawner* hunterSpawner, GameStats* gameStats, GameWindow* statArea, bool* running, char* direction) {
+    // Logic Updates
+    MoveBird(bird, *direction);
+    UpdateStars(starSpawner);
+    ScaleHunters(gameStats);
+    UpdateHunters(hunterSpawner, bird);
+    CheckAllCollisions(bird, starSpawner);
+    CheckAllHunterCollisions(bird, hunterSpawner);
+    UpdateTimer(statArea);
+    UpdateStatus(statArea, bird);
+
+    if(bird->life <= 0 || statArea->stats->timer <= 0) {
+        *running = false;
+    }
+}
+
 // Star Logic
 
 void DrawStar(Star* s) {
@@ -1216,121 +1330,28 @@ void UpdateHunters(HunterSpawner* spawner, Bird* bird)
         MoveHunters(&spawner->hunters[i]);
     }
 }
-
 //------------------------------------------------
 //------------  MAIN -----------------------------
 //------------------------------------------------
-
 int main() {
-    hideCursor();
-    system("cls");
-    system("title Flying Bird Game");
-    srand(time(0));
-
-	GameStats gameStats = loadGameStats("config.txt");
-
-    GameWindow playArea = { OFFX, OFFY, &gameStats, gameStats.MapWidth, gameStats.MapHeight, gameStats.borderColor};
-    playArea.drawBorder();
-
-    GameWindow statArea = { OFFX, OFFY + gameStats.MapHeight, &gameStats, gameStats.MapWidth, gameStats.MapHeight / 4, gameStats.StatusBorder};
-    statArea.drawBorder();
-
-	Bird bird = loadBirdStats("config.txt", &playArea);
-	Hunters hunter = loadHuntersStats("config.txt", &playArea, bird.x, bird.y);
-
+    GameStats gameStats;
+    GameWindow playArea;
+    GameWindow statArea;
+    Bird bird;
     StarSpawner Starspawner;
-	InitSpawner(&Starspawner, &playArea);
-
     HunterSpawner hunterSpawner;
-	InitHunterSpawner(&hunterSpawner, &playArea, &bird);
+
+    InitializeGameSystems(&gameStats, &playArea, &statArea);
+    SetupGameObjects(&gameStats, &playArea, &bird, &Starspawner, &hunterSpawner);
     
     DrawBird(&bird);
 
     bool running = true;
 	char direction = ' ';
     while (running) {
-        if (_kbhit()) {
-            char ch = _getch();
-            switch(ch) {
-                case QUIT:
-                    running = false;
-                    break;
-                case FORWARD:
-				ClearBird(&bird);
-                    if (bird.dy < 0)
-                    {
-                        direction = 'F';
-					updateBirdSprite(&bird, direction);
-                    }
-                    else
-				bird.dy = -bird.dy;
-					    direction = 'F';
-						updateBirdSprite(&bird, direction);
-                    break;
-                case BACKWARD:
-                    ClearBird(&bird);
-                    if (bird.dy > 0)
-                    {
-                        direction = 'S';
-					    updateBirdSprite(&bird, direction);
-                    }
-                    else
-				        bird.dy = -bird.dy;
-					    direction = 'S';
-						updateBirdSprite(&bird, direction);
-                    break;
-                case LEFT:
-                    ClearBird(&bird);
-                    if (bird.dx < 0)
-                    { 
-                        direction = 'L';
-					updateBirdSprite(&bird, direction);
-                    }
-                    else
-                        bird.dx = -bird.dx;
-					    direction = 'L';
-						updateBirdSprite(&bird, direction);
-                    break;
-                case RIGHT:
-                    ClearBird(&bird);
-                    if (bird.dx > 0)
-                    {
-                        direction = 'R';
-					updateBirdSprite(&bird, direction);
-                    }
-                    else
-                        bird.dx = -bird.dx;
-                        direction = 'R';
-					updateBirdSprite(&bird, direction);
-                    break;
-                case SPEED_UP:
-                    if (bird.speed <= bird.initialSpeed/2)
-                        break;
-					else
-                        bird.speed -= bird.speed/10;
-                    break;
-				case SPEED_DOWN:
-                    if(bird.speed >= 2*bird.initialSpeed)
-                        break;
-					else
-                        bird.speed += bird.speed/10;
-                    break;
-			}
-        }
-
-        // Logic Updates
-        MoveBird(&bird, direction);
-		UpdateStars(&Starspawner);
-		ScaleHunters(&gameStats);
-		UpdateHunters(&hunterSpawner, &bird);
-        CheckAllCollisions(&bird, &Starspawner);
-		CheckAllHunterCollisions(&bird, &hunterSpawner);
-		UpdateTimer(&statArea);
-        UpdateStatus(&statArea, &bird);
-
-        if(bird.life <= 0 || statArea.stats->timer <= 0) {
-            running = false;
-		}
+        ProcessUserInput(&bird, &running, &direction);
+        UpdateGameFrame(&bird, &Starspawner, &hunterSpawner, &gameStats, &statArea, &running, &direction);
+        
         Sleep(FRAME_TIME);
     }
 
@@ -1340,4 +1361,4 @@ int main() {
     Sleep(1000);
 
     return 0;
-}    
+}
