@@ -98,24 +98,24 @@ struct GameWindow {
         setColor(color);
 
         gotoxy(x, y);
-        cout << "+";
-        for (int i = 0; i < width - 2; i++) cout << "-";
-        cout << "+";
+        printf("+");
+        for (int i = 0; i < width - 2; i++) printf("-");
+        printf("+");
 
         for (int i = 1; i < height - 1; i++) {
-            gotoxy(x, y + i); cout << "|";
-            gotoxy(x + width - 1, y + i); cout << "|";
+            gotoxy(x, y + i); printf("|");
+            gotoxy(x + width - 1, y + i); printf("|");
         }
 
         gotoxy(x, y + height - 1);
-        cout << "+";
-        for (int i = 0; i < width - 2; i++) cout << "-";
-        cout << "+";
+        printf("+");
+        for (int i = 0; i < width - 2; i++) printf("-");
+        printf("+");
     }
 
     void printAt(int relX, int relY, const char* text) {
         gotoxy(x + relX, y + relY);
-        cout << text;
+        printf("%s", text);
     }
 };
 
@@ -316,7 +316,7 @@ GameStats loadGameStats(const char* filename)
     FILE* file = fopen(filename, "r");
 
     if (file == nullptr) {
-        cout << "Error opening file: " << filename << endl;
+        printf("Error opening a file %s", filename);
     }
 
     char line[256];
@@ -404,7 +404,7 @@ Bird loadBirdStats(const char* filename, GameWindow* win) {
     FILE* file = fopen(filename, "r");
 
     if (file == nullptr) {
-        cout << "Error opening file: " << filename << endl;
+        printf("Error opening a file %s", filename);
     }
 
     char line[256];
@@ -468,7 +468,7 @@ Hunters loadHuntersStats(const char* filename, GameWindow* win, int birdX, int b
     FILE* file = fopen(filename, "r");
 
     if (file == nullptr) {
-        cout << "Error opening file: " << filename << endl;
+        printf("Error opening a file %s", filename);
     }
 
     char line[256];
@@ -578,9 +578,8 @@ Star loadStarsStats(const char* filename, GameWindow* win)
     FILE* file = fopen(filename, "r");
 
     if (file == nullptr) {
-        cout << "Error opening file: " << filename << endl;
-    }
-
+        printf("Error opening a file %s", filename);
+	}
     char line[256];
     char currentSection[50] = "";
 
@@ -651,7 +650,7 @@ void DrawSprite(GameWindow* win, Sprite* sprite, int posX, int posY) {
                 if (ch != ' ') {  // Don't draw spaces (transparent)
                     setColor(sprite->cells[y][x].color);
                     gotoxy(screenX, screenY);
-                    cout << ch;
+                    printf("%s",ch);
                 }
             }
         }
@@ -670,7 +669,7 @@ void ClearSprite(GameWindow* win, Sprite* sprite, int posX, int posY) {
 
                 if (sprite->cells[y][x].character != ' ') {
                     gotoxy(screenX, screenY);
-                    cout << " ";
+                    printf("%s",ch);
                 }
             }
         }
@@ -870,12 +869,12 @@ void UpdateStatus(GameWindow* statWin, Bird* b) {
 void DrawStar(Star* s) {
     setColor(s->color);
     gotoxy(s->parentWin->x + s->x, s->parentWin->y + s->y);
-    cout << s->symbol;
+    printf("%s",s->symbol);
 }
 
 void ClearStar(Star* s) {
     gotoxy(s->parentWin->x + s->x, s->parentWin->y + s->y);
-    cout << " ";
+    printf(" ");
 }
 
 void RespawnStar(Star* s) {
@@ -990,7 +989,7 @@ void DrawHunter(Hunters* h) {
         screenLabelX + LabelWidth <= h->parentWin->x + h->parentWin->stats->MapWidth) {
         setColor(h->color);
         gotoxy(screenLabelX, screenLabelY);
-        std::cout << label;
+        printf("%s",label);
 
         DrawSprite(h->parentWin, &h->sprite, h->x, h->y);
     }
@@ -1007,7 +1006,7 @@ void ClearHunter(Hunters* h) {
         gotoxy(screenLabelX, screenLabelY);
         for (int i = 0; i < h->sprite.width && (screenLabelX + 1) < (h->parentWin->x + h->parentWin->stats->MapWidth); i++)
         {
-			cout << " ";
+			printf(" ");
         }
     }
 
@@ -1086,7 +1085,7 @@ void RespawnHunter(Hunters* h, GameWindow* win, const char* filename, int birdX,
     FILE* file = fopen(filename, "r");
 
     if (file == nullptr) {
-        cout << "Error opening file: " << filename << endl;
+        printf("Error opening a file %s",filename);
     }
 
     char line[256];
@@ -1273,10 +1272,10 @@ int main() {
                     if (bird.dy > 0)
                     {
                         direction = 'S';
-					updateBirdSprite(&bird, direction);
+					    updateBirdSprite(&bird, direction);
                     }
                     else
-				bird.dy = -bird.dy;
+				        bird.dy = -bird.dy;
 					    direction = 'S';
 						updateBirdSprite(&bird, direction);
                     break;
@@ -1337,7 +1336,7 @@ int main() {
 
     system("cls");
     setColor(7);
-    cout << "Game Over. Thanks for playing!" << endl;
+    printf("Game over! Thanks for playing <3 \n");
     Sleep(1000);
 
     return 0;
