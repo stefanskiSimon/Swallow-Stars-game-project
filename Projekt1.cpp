@@ -650,7 +650,7 @@ void DrawSprite(GameWindow* win, Sprite* sprite, int posX, int posY) {
                 if (ch != ' ') {  // Don't draw spaces (transparent)
                     setColor(sprite->cells[y][x].color);
                     gotoxy(screenX, screenY);
-                    printf("%s",ch);
+                    printf("%c",ch);
                 }
             }
         }
@@ -669,7 +669,7 @@ void ClearSprite(GameWindow* win, Sprite* sprite, int posX, int posY) {
 
                 if (sprite->cells[y][x].character != ' ') {
                     gotoxy(screenX, screenY);
-                    printf("%s",ch);
+                    printf(" ");
                 }
             }
         }
