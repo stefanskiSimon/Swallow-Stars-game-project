@@ -864,6 +864,8 @@ void UpdateStatus(GameWindow* statWin, Bird* b) {
     statWin->printAt(2, 1, buffer);
 }
 
+//Initializing Game Systems, objects and inputs
+
 void InitializeGameSystems(GameStats* gameStats, GameWindow* playArea, GameWindow* statArea) {
     hideCursor();
     system("cls");
@@ -1314,6 +1316,8 @@ void UpdateHunters(HunterSpawner* spawner, Bird* bird)
         MoveHunters(&spawner->hunters[i]);
     }
 }
+
+//Frame update
 
 void UpdateGameFrame(Bird* bird, StarSpawner* starSpawner, HunterSpawner* hunterSpawner, GameStats* gameStats, GameWindow* statArea, bool* running, char* direction) {
     // Logic Updates

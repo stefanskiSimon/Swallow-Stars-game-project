@@ -21,7 +21,7 @@ EndColor: 9
 WORLDSETTINGS
 Timer: 20
 BorderColor: 3
-StatusBorder: 14
+StatusBorder: 5
 MapWidth: 60
 MapHeight: 20
 StarSpawnRate: 500
